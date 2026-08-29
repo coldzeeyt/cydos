@@ -1,0 +1,98 @@
+#include <Arduino.h>
+#include <TFT_eSPI.h>
+#include <Preferences.h>
+
+#include "Config.h"
+#include "core/UI.h"
+#include "core/Touch.h"
+#include "core/Battery.h"
+#include "core/Display.h"
+#include "core/AppManager.h"
+
+#include "apps/HomeApp.h"
+#include "apps/WifiRadarApp.h"
+#include "apps/FlashlightApp.h"
+#include "apps/ClockApp.h"
+#include "apps/QrBeamerApp.h"
+#include "apps/DiceApp.h"
+#include "apps/SettingsApp.h"
+
+TFT_eSPI tft;
+Touch touch;
+Battery battery;
+AppManager appManager;
+Preferences prefs;
+
+HomeApp homeApp(&appManager);
+WifiRadarApp wifiApp;
+FlashlightApp flashApp(&appManager);
+ClockApp clockApp;
+QrBeamerApp qrApp;
+DiceApp diceApp;
+SettingsApp settingsApp(&appManager, &touch);
+
+uint8_t g_lastSavedBrightness = 80;
+uint32_t g_lastBrightnessCheck = 0;
+
+void setup() {
+  Serial.begin(115200);
+
+  prefs.begin("cydos", false);
+  uint8_t savedBrightness = prefs.getUChar("bright", 80);
+  g_lastSavedBrightness = savedBrightness;
+
+  tft.init();
+  tft.setRotation(Cfg::SCREEN_ROTATION);
+  tft.fillScreen(Theme::BG);
+
+  Display::beginBacklight();
+  Display::setBrightnessPercent(savedBrightness);
+
+  touch.begin();
+  battery.begin();
+  randomSeed(esp_random());
+
+  appManager.begin(tft, &battery);
+  appManager.setBrightnessPercent(savedBrightness);
+
+  uint8_t homeIdx = appManager.registerApp(&homeApp);
+  uint8_t wifiIdx = appManager.registerApp(&wifiApp);
+  uint8_t flashIdx = appManager.registerApp(&flashApp);
+  uint8_t clockIdx = appManager.registerApp(&clockApp);
+  uint8_t qrIdx = appManager.registerApp(&qrApp);
+  uint8_t diceIdx = appManager.registerApp(&diceApp);
+  uint8_t settingsIdx = appManager.registerApp(&settingsApp);
+
+  homeApp.addTile(UI::iconWifi, wifiIdx);
+  homeApp.addTile(UI::iconFlash, flashIdx);
+  homeApp.addTile(UI::iconClock, clockIdx);
+  homeApp.addTile(UI::iconQR, qrIdx);
+  homeApp.addTile(UI::iconDice, diceIdx);
+  homeApp.addTile(UI::iconGear, settingsIdx);
+
+  appManager.openApp(homeIdx);
+}
+
+void loop() {
+  static int16_t lastX = 0, lastY = 0;
+  static bool wasDown = false;
+
+  int16_t x, y;
+  bool touched = touch.read(x, y);
+  bool pressStart = touched && !wasDown;
+
+  if (touched) { lastX = x; lastY = y; }
+  appManager.loop(lastX, lastY, pressStart, touched);
+  wasDown = touched;
+
+  // Persist brightness to flash, but not on every tiny slider move.
+  uint32_t now = millis();
+  if (now - g_lastBrightnessCheck > 3000) {
+    g_lastBrightnessCheck = now;
+    uint8_t current = appManager.brightnessPercent();
+    if (current != g_lastSavedBrightness) {
+      prefs.putUChar("bright", current);
+      g_lastSavedBrightness = current;
+    }
+  }
+}
