@@ -9,6 +9,7 @@
 #include "core/Display.h"
 #include "core/AppManager.h"
 #include "core/UpdateChecker.h"
+#include "core/WallClock.h"
 
 #include "apps/HomeApp.h"
 #include "apps/WifiRadarApp.h"
@@ -16,6 +17,9 @@
 #include "apps/ClockApp.h"
 #include "apps/QrBeamerApp.h"
 #include "apps/DiceApp.h"
+#include "apps/CalculatorApp.h"
+#include "apps/PasswordGenApp.h"
+#include "apps/MorseBeaconApp.h"
 #include "apps/SettingsApp.h"
 
 TFT_eSPI tft;
@@ -24,14 +28,18 @@ Battery battery;
 AppManager appManager;
 Preferences prefs;
 UpdateChecker updateChecker;
+WallClock wallClock;
 
 HomeApp homeApp(&appManager);
 WifiRadarApp wifiApp;
 FlashlightApp flashApp(&appManager);
-ClockApp clockApp;
+ClockApp clockApp(&wallClock);
 QrBeamerApp qrApp;
 DiceApp diceApp;
-SettingsApp settingsApp(&appManager, &touch, &prefs, &updateChecker);
+CalculatorApp calcApp;
+PasswordGenApp passwordApp;
+MorseBeaconApp morseApp;
+SettingsApp settingsApp(&appManager, &touch, &prefs, &updateChecker, &wallClock);
 
 uint8_t g_lastSavedBrightness = 80;
 uint32_t g_lastBrightnessCheck = 0;
@@ -57,6 +65,7 @@ void setup() {
   updateChecker.begin(&prefs);
   appManager.begin(tft, &battery, &updateChecker);
   appManager.setBrightnessPercent(savedBrightness);
+  appManager.setBatteryVisible(prefs.getBool("battshow", true));
 
   uint8_t homeIdx = appManager.registerApp(&homeApp);
   uint8_t wifiIdx = appManager.registerApp(&wifiApp);
@@ -64,6 +73,9 @@ void setup() {
   uint8_t clockIdx = appManager.registerApp(&clockApp);
   uint8_t qrIdx = appManager.registerApp(&qrApp);
   uint8_t diceIdx = appManager.registerApp(&diceApp);
+  uint8_t calcIdx = appManager.registerApp(&calcApp);
+  uint8_t passwordIdx = appManager.registerApp(&passwordApp);
+  uint8_t morseIdx = appManager.registerApp(&morseApp);
   uint8_t settingsIdx = appManager.registerApp(&settingsApp);
 
   homeApp.addTile(UI::iconWifi, wifiIdx);
@@ -71,6 +83,9 @@ void setup() {
   homeApp.addTile(UI::iconClock, clockIdx);
   homeApp.addTile(UI::iconQR, qrIdx);
   homeApp.addTile(UI::iconDice, diceIdx);
+  homeApp.addTile(UI::iconCalc, calcIdx);
+  homeApp.addTile(UI::iconKey, passwordIdx);
+  homeApp.addTile(UI::iconMorse, morseIdx);
   homeApp.addTile(UI::iconGear, settingsIdx);
 
   appManager.openApp(homeIdx);

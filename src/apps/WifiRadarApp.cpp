@@ -17,9 +17,14 @@ void WifiRadarApp::onEnter(TFT_eSPI& tft) {
   _cy = Cfg::STATUS_BAR_H + (Cfg::SCREEN_H - Cfg::STATUS_BAR_H) / 2 + 4;
   _radius = 92;
   _selected = -1;
+  _scanning = false;
+  _neverScanned = true;
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
-  startScan();
+  // Switching into STA mode takes the radio a moment to settle - starting
+  // a scan in the same tick as WiFi.mode()/disconnect() is a common way to
+  // get WIFI_SCAN_FAILED back on real hardware, so give it a beat first.
+  _nextScanAt = millis() + 300;
   _dirty = true;
 }
 
@@ -31,12 +36,20 @@ void WifiRadarApp::onExit() {
 void WifiRadarApp::startScan() {
   WiFi.scanNetworks(true /*async*/, false /*hidden*/);
   _scanning = true;
-  _lastScanStart = millis();
 }
 
 void WifiRadarApp::collectResults() {
   int n = WiFi.scanComplete();
-  if (n < 0) return;
+  if (n == WIFI_SCAN_RUNNING) return; // still going - check again next tick
+
+  _scanning = false;
+  if (n < 0) {
+    // WIFI_SCAN_FAILED (or anything else unexpected) - don't get stuck
+    // showing "scanning..." forever, just try again shortly.
+    _nextScanAt = millis() + 1500;
+    return;
+  }
+
   _netCount = 0;
   for (int i = 0; i < n && _netCount < MAX_NETS; i++) {
     Net& net = _nets[_netCount];
@@ -49,13 +62,14 @@ void WifiRadarApp::collectResults() {
     _netCount++;
   }
   WiFi.scanDelete();
-  _scanning = false;
+  _neverScanned = false;
+  _nextScanAt = millis() + RESCAN_INTERVAL_MS;
   _dirty = true;
 }
 
 bool WifiRadarApp::update() {
   if (_scanning) collectResults();
-  else if (millis() - _lastScanStart > RESCAN_INTERVAL_MS) startScan();
+  else if (millis() >= _nextScanAt) startScan();
 
   if (millis() - _lastFrame >= FRAME_MS) {
     _lastFrame = millis();
@@ -83,7 +97,7 @@ void WifiRadarApp::drawRadarFace(TFT_eSPI& tft) {
     tft.drawLine(_cx, _cy, _cx + cos(trad) * _radius, _cy + sin(trad) * _radius, Theme::PANEL);
   }
 
-  const char* status = _scanning ? "scanning..." : "";
+  const char* status = _scanning ? "scanning..." : (_neverScanned ? "starting WiFi..." : "");
   UI::centerText(tft, status, _cx, Cfg::STATUS_BAR_H + 10, 2, Theme::MUTED);
 }
 

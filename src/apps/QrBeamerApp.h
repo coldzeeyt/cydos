@@ -21,8 +21,8 @@ private:
   char _text[MAX_LEN + 1] = {0};
   size_t _len = 0;
 
-  static constexpr uint8_t NUM_ROWS = 4;
-  const char* _rows[NUM_ROWS] = {"1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm"};
+  static constexpr uint8_t NUM_ROWS = 5;
+  const char* _rows[NUM_ROWS] = {"1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm", "./:-_@"};
 
   UI::Button _spaceBtn{{4, 0, 100, 26}, "SPACE"};
   UI::Button _delBtn{{108, 0, 90, 26}, "DEL"};

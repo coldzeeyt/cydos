@@ -31,7 +31,8 @@ private:
   Net _nets[MAX_NETS];
   uint8_t _netCount = 0;
   bool _scanning = false;
-  uint32_t _lastScanStart = 0;
+  uint32_t _nextScanAt = 0;
+  bool _neverScanned = true;
   float _sweepDeg = 0;
   uint32_t _lastFrame = 0;
   int8_t _selected = -1;

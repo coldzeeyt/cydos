@@ -79,6 +79,18 @@ struct Slider {
   }
 };
 
+// Blends fg over bg at the given opacity (0-1), all in RGB565. TFT_eSPI has
+// no real alpha channel, so this just does the channel math by hand -
+// used for the timer's "flash" alarm rather than a flat, jarring color.
+inline uint16_t blend565(uint16_t fg, uint16_t bg, float alpha) {
+  uint8_t fr = (fg >> 11) & 0x1F, fgg = (fg >> 5) & 0x3F, fb = fg & 0x1F;
+  uint8_t br = (bg >> 11) & 0x1F, bgg = (bg >> 5) & 0x3F, bb = bg & 0x1F;
+  uint8_t r = (uint8_t)(fr * alpha + br * (1 - alpha));
+  uint8_t g = (uint8_t)(fgg * alpha + bgg * (1 - alpha));
+  uint8_t b = (uint8_t)(fb * alpha + bb * (1 - alpha));
+  return (uint16_t)((r << 11) | (g << 5) | b);
+}
+
 inline void clearContent(TFT_eSPI& tft) {
   tft.fillRect(0, Cfg::STATUS_BAR_H, Cfg::SCREEN_W, Cfg::SCREEN_H - Cfg::STATUS_BAR_H, Theme::BG);
 }
@@ -135,6 +147,26 @@ inline void iconGear(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
     float rad = a * DEG_TO_RAD;
     tft.drawLine(cx + cos(rad) * 10, cy + sin(rad) * 10, cx + cos(rad) * 14, cy + sin(rad) * 14, c);
   }
+}
+inline void iconCalc(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.drawRoundRect(cx - 12, cy - 15, 24, 30, 3, c);
+  tft.drawFastHLine(cx - 8, cy - 9, 16, c);
+  for (int row = 0; row < 3; row++) {
+    for (int col = 0; col < 3; col++) {
+      tft.fillRect(cx - 8 + col * 7, cy - 1 + row * 6, 4, 3, c);
+    }
+  }
+}
+inline void iconKey(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.drawCircle(cx - 7, cy - 7, 6, c);
+  tft.drawLine(cx - 3, cy - 3, cx + 12, cy + 12, c);
+  tft.drawLine(cx + 8, cy + 8, cx + 12, cy + 4, c);
+  tft.drawLine(cx + 12, cy + 12, cx + 16, cy + 8, c);
+}
+inline void iconMorse(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.fillCircle(cx - 12, cy, 3, c);
+  tft.fillRoundRect(cx - 5, cy - 3, 12, 6, 2, c);
+  tft.fillCircle(cx + 12, cy, 3, c);
 }
 
 } // namespace UI

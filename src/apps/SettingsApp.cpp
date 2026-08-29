@@ -19,19 +19,37 @@ void SettingsApp::loadWifiCreds() {
 
 void SettingsApp::drawMain(TFT_eSPI& tft) {
   UI::clearContent(tft);
-  UI::centerText(tft, "Brightness", Cfg::SCREEN_W / 2, 50, 2, Theme::MUTED);
+  UI::centerText(tft, "Brightness", Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 14, 1, Theme::MUTED);
   _brightSlider.draw(tft);
   char buf[8];
   snprintf(buf, sizeof(buf), "%d%%", _brightSlider.value);
-  UI::centerText(tft, buf, Cfg::SCREEN_W / 2, 110, 2, Theme::TEXT);
+  UI::centerText(tft, buf, Cfg::SCREEN_W / 2, 94, 1, Theme::TEXT);
 
   _touchTestBtn.draw(tft);
+  _setTimeBtn.draw(tft);
   _wifiBtn.draw(tft);
+
+  _battToggleBtn.label = _mgr->batteryVisible() ? "Battery Icon: ON" : "Battery Icon: OFF";
+  _battToggleBtn.draw(tft);
 
   char verBuf[24];
   snprintf(verBuf, sizeof(verBuf), "CydOs v%s", CYDOS_VERSION);
-  UI::centerText(tft, verBuf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 30, 2, Theme::MUTED);
-  UI::centerText(tft, "a tiny OS for the Cheap Yellow Display", Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 14, 1, Theme::MUTED);
+  UI::centerText(tft, verBuf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 10, 1, Theme::MUTED);
+}
+
+void SettingsApp::drawSetTime(TFT_eSPI& tft) {
+  UI::clearContent(tft);
+  _backBtn.draw(tft);
+
+  uint32_t s = _clock->secondsSinceMidnight();
+  char buf[12];
+  snprintf(buf, sizeof(buf), "%02u:%02u:%02u", s / 3600, (s % 3600) / 60, s % 60);
+  UI::centerText(tft, buf, Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 55, 7, Theme::ACCENT);
+
+  _timeHourUp.draw(tft);
+  _timeHourDn.draw(tft);
+  _timeMinUp.draw(tft);
+  _timeMinDn.draw(tft);
 }
 
 void SettingsApp::drawTouchTest(TFT_eSPI& tft) {
@@ -160,6 +178,7 @@ void SettingsApp::draw(TFT_eSPI& tft) {
     case TOUCH_TEST: drawTouchTest(tft); break;
     case WIFI: drawWifi(tft); break;
     case WIFI_KEYBOARD: drawWifiKeyboard(tft); break;
+    case SET_TIME: drawSetTime(tft); break;
   }
 }
 
@@ -174,6 +193,18 @@ void SettingsApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
     _lastTouchY = y;
     int16_t rx, ry;
     if (_touch->readRaw(rx, ry)) { _lastRawX = rx; _lastRawY = ry; }
+    _dirty = true;
+    return;
+  }
+
+  if (_mode == SET_TIME) {
+    if (!down) return;
+    if (_backBtn.hit(x, y)) { _mode = MAIN; _dirty = true; return; }
+    if (_timeHourUp.hit(x, y)) _clock->addHours(1);
+    else if (_timeHourDn.hit(x, y)) _clock->addHours(-1);
+    else if (_timeMinUp.hit(x, y)) _clock->addMinutes(1);
+    else if (_timeMinDn.hit(x, y)) _clock->addMinutes(-1);
+    else return;
     _dirty = true;
     return;
   }
@@ -238,9 +269,21 @@ void SettingsApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
     _dirty = true;
     return;
   }
+  if (down && _setTimeBtn.hit(x, y)) {
+    _mode = SET_TIME;
+    _dirty = true;
+    return;
+  }
   if (down && _wifiBtn.hit(x, y)) {
     loadWifiCreds();
     _mode = WIFI;
+    _dirty = true;
+    return;
+  }
+  if (down && _battToggleBtn.hit(x, y)) {
+    bool visible = !_mgr->batteryVisible();
+    _mgr->setBatteryVisible(visible);
+    _prefs->putBool("battshow", visible);
     _dirty = true;
     return;
   }

@@ -29,8 +29,8 @@ public:
   void onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) override;
 
 private:
-  static constexpr uint8_t MAX_TILES = 8;
-  static constexpr uint8_t COLS = 4;
+  static constexpr uint8_t MAX_TILES = 12;
+  static constexpr uint8_t COLS = 3;
 
   AppManager* _mgr;
   IconFn _icons[MAX_TILES];

@@ -18,17 +18,23 @@ void HomeApp::draw(TFT_eSPI& tft) {
   UI::clearContent(tft);
 
   for (uint8_t i = 0; i < _tileCount; i++) {
-    UI::Rect r = tileRect(i);
+    UI::Rect cell = tileRect(i);
     App* app = _mgr->appAt(_appIndex[i]);
 
-    tft.drawRect(r.x, r.y, r.w, r.h, Theme::PANEL2);
-    int16_t cx = r.x + r.w / 2;
-    int16_t cy = r.y + r.h / 2 - 8;
+    // A little breathing room between cells reads as a grid of app icons
+    // rather than a spreadsheet.
+    int16_t pad = 4;
+    UI::Rect card{(int16_t)(cell.x + pad), (int16_t)(cell.y + pad), (int16_t)(cell.w - pad * 2), (int16_t)(cell.h - pad * 2)};
+    tft.fillRoundRect(card.x, card.y, card.w, card.h, 8, Theme::PANEL);
+
+    int16_t cx = card.x + card.w / 2;
+    int16_t cy = card.y + card.h / 2 - 9;
+    tft.fillCircle(cx, cy, 17, Theme::PANEL2);
     if (_icons[i]) _icons[i](tft, cx, cy, Theme::ACCENT);
 
-    tft.setTextColor(Theme::TEXT, Theme::BG);
+    tft.setTextColor(Theme::TEXT, Theme::PANEL);
     tft.setTextDatum(MC_DATUM);
-    tft.drawString(app ? app->name() : "?", cx, r.y + r.h - 14, 2);
+    tft.drawString(app ? app->name() : "?", cx, card.y + card.h - 13, 1);
     tft.setTextDatum(TL_DATUM);
   }
 }

@@ -4,16 +4,17 @@
 #include "core/UI.h"
 #include "core/Touch.h"
 #include "core/UpdateChecker.h"
+#include "core/WallClock.h"
 
 class AppManager;
 
 // Global brightness (persisted across apps), WiFi setup for the update
-// checker, and a touch test screen for dialing in Config.h's calibration
-// constants.
+// checker, manual time setting, and a touch test screen for dialing in
+// Config.h's calibration constants.
 class SettingsApp : public App {
 public:
-  SettingsApp(AppManager* mgr, Touch* touch, Preferences* prefs, UpdateChecker* updates)
-      : _mgr(mgr), _touch(touch), _prefs(prefs), _updates(updates) {}
+  SettingsApp(AppManager* mgr, Touch* touch, Preferences* prefs, UpdateChecker* updates, WallClock* clock)
+      : _mgr(mgr), _touch(touch), _prefs(prefs), _updates(updates), _clock(clock) {}
 
   const char* name() const override { return "Settings"; }
 
@@ -24,7 +25,7 @@ public:
   void onTouchUp() override { _draggingSlider = false; }
 
 private:
-  enum Mode { MAIN, TOUCH_TEST, WIFI, WIFI_KEYBOARD };
+  enum Mode { MAIN, TOUCH_TEST, WIFI, WIFI_KEYBOARD, SET_TIME };
   Mode _mode = MAIN;
   enum Field { FIELD_SSID, FIELD_PASS };
   Field _activeField = FIELD_SSID;
@@ -33,11 +34,18 @@ private:
   Touch* _touch;
   Preferences* _prefs;
   UpdateChecker* _updates;
+  WallClock* _clock;
 
-  UI::Slider _brightSlider{{40, 70, Cfg::SCREEN_W - 80, 30}, 80};
-  UI::Button _touchTestBtn{{40, 122, Cfg::SCREEN_W - 80, 34}, "Touch Test"};
-  UI::Button _wifiBtn{{40, 164, Cfg::SCREEN_W - 80, 34}, "WiFi Setup"};
+  UI::Slider _brightSlider{{40, 58, Cfg::SCREEN_W - 80, 26}, 80};
+  UI::Button _touchTestBtn{{40, 106, 116, 28}, "Touch Test"};
+  UI::Button _setTimeBtn{{164, 106, 116, 28}, "Set Time"};
+  UI::Button _wifiBtn{{40, 140, Cfg::SCREEN_W - 80, 28}, "WiFi Setup"};
+  UI::Button _battToggleBtn{{40, 174, Cfg::SCREEN_W - 80, 28}, "Battery Icon: ON"};
   UI::Button _backBtn{{10, Cfg::STATUS_BAR_H + 6, 90, 30}, "<- Back"};
+  UI::Button _timeHourUp{{40, Cfg::STATUS_BAR_H + 90, 40, 34}, "H+"};
+  UI::Button _timeHourDn{{90, Cfg::STATUS_BAR_H + 90, 40, 34}, "H-"};
+  UI::Button _timeMinUp{{190, Cfg::STATUS_BAR_H + 90, 40, 34}, "M+"};
+  UI::Button _timeMinDn{{240, Cfg::STATUS_BAR_H + 90, 40, 34}, "M-"};
   UI::Button _wifiSaveBtn{{30, 158, 130, 34}, "Save"};
   UI::Button _wifiTestBtn{{170, 158, 120, 34}, "Test Now"};
   UI::Button _kbSpaceBtn{{4, 0, 100, 26}, "SPACE"};
@@ -63,6 +71,7 @@ private:
   void drawTouchTest(TFT_eSPI& tft);
   void drawWifi(TFT_eSPI& tft);
   void drawWifiKeyboard(TFT_eSPI& tft);
+  void drawSetTime(TFT_eSPI& tft);
 
   char* activeBuf() { return _activeField == FIELD_SSID ? _ssid : _pass; }
   size_t activeMax() { return _activeField == FIELD_SSID ? SSID_MAX : PASS_MAX; }

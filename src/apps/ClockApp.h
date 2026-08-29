@@ -1,11 +1,16 @@
 #pragma once
 #include "App.h"
 #include "core/UI.h"
+#include "core/WallClock.h"
 
 // Three tabs in one app: a manually-set clock, a stopwatch, and a
-// countdown timer. All styled the same, all driven off millis().
+// countdown timer. All styled the same, all driven off millis(). The
+// clock tab reads/writes a WallClock shared with Settings > Set Time, so
+// either place can set the time.
 class ClockApp : public App {
 public:
+  explicit ClockApp(WallClock* clock) : _clock(clock) {}
+
   const char* name() const override { return "Clock"; }
 
   void onEnter(TFT_eSPI& tft) override { _dirty = true; }
@@ -24,7 +29,7 @@ private:
   };
 
   // Clock tab
-  int32_t _clockOffsetSec = 12 * 3600;  // seconds since midnight, settable
+  WallClock* _clock;
   UI::Button _hourUp{{40, 170, 40, 34}, "H+"};
   UI::Button _hourDn{{90, 170, 40, 34}, "H-"};
   UI::Button _minUp{{190, 170, 40, 34}, "M+"};
@@ -48,6 +53,7 @@ private:
   UI::Button _timerSecDn{{240, 130, 60, 34}, "-10s"};
   UI::Button _timerStartStop{{40, 175, 110, 36}, "Start"};
   UI::Button _timerReset{{170, 175, 110, 36}, "Reset"};
+  uint32_t _alarmUntil = 0; // millis() deadline for the red/white "time's up" flash
 
   bool _dirty = true;
 

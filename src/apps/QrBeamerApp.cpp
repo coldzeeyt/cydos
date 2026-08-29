@@ -11,7 +11,7 @@ void QrBeamerApp::onEnter(TFT_eSPI& tft) {
 
 UI::Rect QrBeamerApp::keyRect(uint8_t row, uint8_t col, uint8_t rowLen) const {
   int16_t top = Cfg::STATUS_BAR_H + 30;
-  int16_t rowH = 26;
+  int16_t rowH = 24;
   int16_t keyW = Cfg::SCREEN_W / rowLen;
   return {(int16_t)(col * keyW + 1), (int16_t)(top + row * rowH), (int16_t)(keyW - 2), (int16_t)(rowH - 4)};
 }
@@ -41,7 +41,7 @@ void QrBeamerApp::drawKeyboard(TFT_eSPI& tft) {
     }
   }
 
-  int16_t ctrlY = Cfg::STATUS_BAR_H + 30 + NUM_ROWS * 26 + 4;
+  int16_t ctrlY = Cfg::STATUS_BAR_H + 30 + NUM_ROWS * 24 + 4;
   _spaceBtn.r.y = ctrlY;
   _delBtn.r.y = ctrlY;
   _clrBtn.r.y = ctrlY;
@@ -49,7 +49,7 @@ void QrBeamerApp::drawKeyboard(TFT_eSPI& tft) {
   _delBtn.draw(tft);
   _clrBtn.draw(tft);
 
-  _genBtn.r.y = ctrlY + 30;
+  _genBtn.r.y = ctrlY + 28;
   _genBtn.color = _len ? Theme::PANEL : Theme::PANEL2;
   _genBtn.textColor = _len ? Theme::ACCENT : Theme::MUTED;
   _genBtn.draw(tft);

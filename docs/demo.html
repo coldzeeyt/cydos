@@ -48,28 +48,39 @@
   h1 { font-size: 26px; margin: 0 0 8px; letter-spacing: -0.01em; }
   .head p { color: var(--muted); font-size: 14px; margin: 0; line-height: 1.5; }
 
-  /* ---- device mockup: fixed identity, same in both themes ---- */
+  /* ---- device mockup: modeled on the real ELEGOO CYD board, fixed
+     identity (same in both themes) since it's a physical object ---- */
   .board {
-    background: linear-gradient(160deg, #e9d548, #d9c22f);
-    border-radius: 22px;
-    padding: 22px 22px 30px;
-    box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 18px 40px -18px rgba(0,0,0,0.45);
+    background: linear-gradient(175deg, #fbfaf7, #ebe9e4);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 18px 40px -18px rgba(0,0,0,0.45);
     position: relative;
     touch-action: none;
   }
-  .board::before {
-    content: ""; position: absolute; top: 10px; left: 10px; width: 9px; height: 9px;
-    border-radius: 50%; background: #00000022; box-shadow: 6px 0 0 #00000022;
+  .board .screw {
+    position: absolute; width: 18px; height: 18px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #ffd27a, #e2901f 65%, #a8630f);
+    box-shadow: inset 0 1px 2px rgba(255,255,255,0.6), inset 0 -1px 2px rgba(0,0,0,0.3);
   }
-  .board::after {
-    content: ""; position: absolute; bottom: 10px; right: 10px; width: 9px; height: 9px;
-    border-radius: 50%; background: #00000022; box-shadow: -6px 0 0 #00000022;
+  .board .screw.tl { top: 7px; left: 7px; }
+  .board .screw.tr { top: 7px; right: 7px; }
+  .board .screw.bl { bottom: 7px; left: 7px; }
+  .board .screw.br { bottom: 7px; right: 7px; }
+  .board .sidebtns {
+    position: absolute; left: -2px; top: 50%; transform: translateY(-50%);
+    display: flex; flex-direction: column; gap: 16px;
+  }
+  .board .sidebtns span {
+    display: block; width: 7px; height: 20px; border-radius: 2px 0 0 2px;
+    background: #2b2b28; box-shadow: -1px 0 2px rgba(0,0,0,0.3);
   }
   .screenframe {
     background: #0c0c0c; border-radius: 8px; padding: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
   }
   canvas {
-    display: block; width: 480px; height: 360px; max-width: 82vw; height: auto;
+    display: block; width: 480px; max-width: 82vw;
+    aspect-ratio: 4 / 3; /* matches the CYD's real 320x240 panel */
     border-radius: 2px; cursor: pointer;
     image-rendering: -webkit-optimize-contrast;
   }
@@ -123,6 +134,11 @@
 </div>
 
 <div class="board">
+  <span class="screw tl"></span>
+  <span class="screw tr"></span>
+  <span class="screw bl"></span>
+  <span class="screw br"></span>
+  <div class="sidebtns"><span></span><span></span></div>
   <div class="screenframe">
     <canvas id="screen" width="640" height="480"></canvas>
   </div>
@@ -274,6 +290,30 @@
       ctx.stroke();
     }
   }
+  function iconCalc(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    roundRect(cx - 12, cy - 15, 24, 30, 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 8, cy - 9); ctx.lineTo(cx + 8, cy - 9); ctx.stroke();
+    ctx.fillStyle = c;
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 3; col++) {
+        ctx.fillRect(cx - 8 + col * 7, cy - 1 + row * 6, 4, 3);
+      }
+    }
+  }
+  function iconKey(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx - 7, cy - 7, 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 3, cy - 3); ctx.lineTo(cx + 12, cy + 12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 8, cy + 8); ctx.lineTo(cx + 12, cy + 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 12, cy + 12); ctx.lineTo(cx + 16, cy + 8); ctx.stroke();
+  }
+  function iconMorse(cx, cy, c) {
+    ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(cx - 12, cy, 3, 0, Math.PI * 2); ctx.fill();
+    roundRect(cx - 5, cy - 3, 12, 6, 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 12, cy, 3, 0, Math.PI * 2); ctx.fill();
+  }
 
   // ---------- shared state ----------
   const S = {
@@ -288,6 +328,12 @@
     timerSetSec: 60, timerRemainMs: 60000, timerRunning: false, timerLast: 0,
     qrText: '', qrShowing: false,
     diceMode: 0, diceResult: 1, diceRolling: false, diceRollStart: 0, diceLastFlicker: 0,
+    calcDisplay: '0', calcAcc: 0, calcPendingOp: null, calcFresh: true, calcError: false,
+    pwLength: 16, pwUpper: true, pwDigits: true, pwSymbols: false, pwValue: '', pwShowing: false,
+    morseText: '', morseSending: false, morseSchedule: [], morseStep: 0, morseStepStart: 0, morseOn: false,
+    showBattery: true,
+    settingsMode: 'main',
+    timerAlarmUntil: 0,
   };
 
   const TILES = [
@@ -296,11 +342,15 @@
     { id: 'clock', name: 'Clock', icon: iconClock },
     { id: 'qr', name: 'QR Beamer', icon: iconQR },
     { id: 'dice', name: 'Dice', icon: iconDice },
+    { id: 'calc', name: 'Calculator', icon: iconCalc },
+    { id: 'password', name: 'Password', icon: iconKey },
+    { id: 'morse', name: 'Morse', icon: iconMorse },
     { id: 'settings', name: 'Settings', icon: iconGear },
   ];
   const APP_NAMES = {
     home: 'CydOs', wifi: 'WiFi Radar', flash: 'Flashlight', clock: 'Clock',
-    qr: 'QR Beamer', dice: 'Dice', settings: 'Settings',
+    qr: 'QR Beamer', dice: 'Dice', calc: 'Calculator', password: 'Password',
+    morse: 'Morse', settings: 'Settings',
   };
 
   function openApp(id) {
@@ -311,20 +361,25 @@
     if (leavingFlash) applyBrightness(S.brightness);
     if (id === 'dice') S.diceRolling = false;
     if (id === 'qr') S.qrShowing = false;
+    if (id === 'password') S.pwShowing = false;
+    if (id === 'morse') S.morseSending = false;
+    if (id === 'settings') S.settingsMode = 'main';
   }
 
   function drawHome() {
     clearContent();
-    const cols = 3, rows = 2;
+    const cols = 3, rows = 3;
     const tw = W / cols, th = (H - STATUS_H) / rows;
     TILES.forEach(function (tile, i) {
       const col = i % cols, row = Math.floor(i / cols);
       const x = col * tw, y = STATUS_H + row * th;
-      ctx.strokeStyle = Theme.panel2; ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, y + 0.5, tw - 1, th - 1);
-      const cx = x + tw / 2, cy = y + th / 2 - 8;
+      const pad = 4;
+      const cardX = x + pad, cardY = y + pad, cardW = tw - pad * 2, cardH = th - pad * 2;
+      roundRect(cardX, cardY, cardW, cardH, 8); ctx.fillStyle = Theme.panel; ctx.fill();
+      const cx = cardX + cardW / 2, cy = cardY + cardH / 2 - 9;
+      ctx.beginPath(); ctx.arc(cx, cy, 17, 0, Math.PI * 2); ctx.fillStyle = Theme.panel2; ctx.fill();
       tile.icon(cx, cy, Theme.accent);
-      centerText(tile.name, cx, y + th - 14, '500 11px "IBM Plex Mono", monospace', Theme.text);
+      centerText(tile.name, cx, cardY + cardH - 12, '500 10px "IBM Plex Mono", monospace', Theme.text);
       registerHit(x, y, tw, th, function () { openApp(tile.id); });
     });
   }
@@ -347,10 +402,12 @@
     ctx.textAlign = 'left';
     ctx.fillText(APP_NAMES[S.current], titleX, STATUS_H / 2 + 1);
 
-    const bw2 = 30, bh2 = 14, bx2 = W - bw2 - 10, by2 = (STATUS_H - bh2) / 2;
-    ctx.strokeStyle = Theme.muted; ctx.strokeRect(bx2, by2, bw2, bh2);
-    ctx.fillStyle = Theme.muted; ctx.fillRect(bx2 + bw2, by2 + 3, 2, bh2 - 6);
-    ctx.fillStyle = Theme.good; ctx.fillRect(bx2 + 2, by2 + 2, (bw2 - 4) * 0.82, bh2 - 4);
+    if (S.showBattery) {
+      const bw2 = 30, bh2 = 14, bx2 = W - bw2 - 10, by2 = (STATUS_H - bh2) / 2;
+      ctx.strokeStyle = Theme.muted; ctx.strokeRect(bx2, by2, bw2, bh2);
+      ctx.fillStyle = Theme.muted; ctx.fillRect(bx2 + bw2, by2 + 3, 2, bh2 - 6);
+      ctx.fillStyle = Theme.good; ctx.fillRect(bx2 + 2, by2 + 2, (bw2 - 4) * 0.82, bh2 - 4);
+    }
   }
 
   // ---------- WiFi Radar (demo data - a browser tab can't scan real WiFi) ----------
@@ -486,6 +543,15 @@
         },
       });
       button(170, 175, 110, 36, 'Reset', { onTap: function () { S.timerRunning = false; S.timerRemainMs = S.timerSetSec * 1000; } });
+
+      const now = performance.now();
+      if (now < S.timerAlarmUntil) {
+        const redPhase = Math.floor((S.timerAlarmUntil - now) / 125) % 2 === 0;
+        ctx.globalAlpha = 0.75;
+        ctx.fillStyle = redPhase ? Theme.danger : Theme.text;
+        ctx.fillRect(0, STATUS_H, W, H - STATUS_H);
+        ctx.globalAlpha = 1;
+      }
     }
   }
 
@@ -494,12 +560,16 @@
       const now = performance.now();
       S.timerRemainMs -= now - S.timerLast;
       S.timerLast = now;
-      if (S.timerRemainMs <= 0) { S.timerRemainMs = 0; S.timerRunning = false; }
+      if (S.timerRemainMs <= 0) {
+        S.timerRemainMs = 0;
+        S.timerRunning = false;
+        S.timerAlarmUntil = performance.now() + 1000;
+      }
     }
   }
 
   // ---------- QR Beamer ----------
-  const KB_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+  const KB_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm', './:-_@'];
 
   function drawQrKeyboard() {
     clearContent();
@@ -509,7 +579,7 @@
     ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
     ctx.fillText(S.qrText ? shown : 'type a message...', 10, STATUS_H + 15);
 
-    const top = STATUS_H + 30, rowH = 26;
+    const top = STATUS_H + 30, rowH = 24;
     KB_ROWS.forEach(function (row, r) {
       const keyW = W / row.length;
       for (let c = 0; c < row.length; c++) {
@@ -525,7 +595,7 @@
     button(4, ctrlY, 100, 26, 'SPACE', { onTap: function () { if (S.qrText.length < 100) S.qrText += ' '; } });
     button(108, ctrlY, 90, 26, 'DEL', { onTap: function () { S.qrText = S.qrText.slice(0, -1); } });
     button(202, ctrlY, 54, 26, 'CLR', { onTap: function () { S.qrText = ''; } });
-    button(4, ctrlY + 30, W - 8, 28, 'Generate QR ->', {
+    button(4, ctrlY + 28, W - 8, 28, 'Generate QR ->', {
       color: S.qrText ? Theme.panel : Theme.panel2,
       textColor: S.qrText ? Theme.accent : Theme.muted,
       onTap: function () { if (S.qrText) S.qrShowing = true; },
@@ -613,20 +683,282 @@
     }
   }
 
-  // ---------- Settings ----------
-  function drawSettings() {
+  // ---------- Calculator ----------
+  const CALC_KEYS = [
+    ['7', '8', '9', '/'],
+    ['4', '5', '6', '*'],
+    ['1', '2', '3', '-'],
+    ['C', '0', '.', '+'],
+  ];
+  const CALC_KEY_TOP = STATUS_H + 40, CALC_KEY_H = 34, CALC_KEY_W = W / 4;
+  const CALC_EQ_Y = CALC_KEY_TOP + 4 * CALC_KEY_H;
+
+  function calcClear() {
+    S.calcDisplay = '0'; S.calcAcc = 0; S.calcPendingOp = null; S.calcFresh = true; S.calcError = false;
+  }
+  function calcSetDisplay(v) {
+    if (!isFinite(v)) { S.calcError = true; S.calcDisplay = 'Err'; return; }
+    S.calcDisplay = String(parseFloat(v.toPrecision(10)));
+  }
+  function calcApplyPending() {
+    const entry = parseFloat(S.calcDisplay) || 0;
+    switch (S.calcPendingOp) {
+      case '+': S.calcAcc += entry; break;
+      case '-': S.calcAcc -= entry; break;
+      case '*': S.calcAcc *= entry; break;
+      case '/': if (entry === 0) { calcSetDisplay(Infinity); return; } S.calcAcc /= entry; break;
+      default: S.calcAcc = entry; break;
+    }
+  }
+  function calcPressKey(label) {
+    if (label === 'C') { calcClear(); return; }
+    if (S.calcError && label !== 'C') calcClear();
+    if (label === '.') {
+      if (S.calcFresh) { S.calcDisplay = '0.'; S.calcFresh = false; }
+      else if (S.calcDisplay.indexOf('.') === -1) S.calcDisplay += '.';
+      return;
+    }
+    if ('+-*/'.indexOf(label) !== -1) {
+      if (S.calcPendingOp && !S.calcFresh) { calcApplyPending(); if (!S.calcError) calcSetDisplay(S.calcAcc); }
+      else { S.calcAcc = parseFloat(S.calcDisplay) || 0; }
+      S.calcPendingOp = label;
+      S.calcFresh = true;
+      return;
+    }
+    // digit
+    if (S.calcFresh) { S.calcDisplay = label; S.calcFresh = false; }
+    else if (S.calcDisplay.length < 16) S.calcDisplay += label;
+  }
+  function calcEquals() {
+    if (S.calcError) return;
+    if (S.calcPendingOp) { calcApplyPending(); if (!S.calcError) calcSetDisplay(S.calcAcc); }
+    S.calcPendingOp = null;
+    S.calcFresh = true;
+  }
+
+  function drawCalc() {
     clearContent();
-    centerText('Brightness', W / 2, 50, '500 11px "IBM Plex Mono", monospace', Theme.muted);
-    slider(40, 70, W - 80, 30, S.brightness, function (v) { S.brightness = v; applyBrightness(v); });
-    centerText(S.brightness + '%', W / 2, 110, '600 12px "IBM Plex Mono", monospace', Theme.text);
-    centerText('CydOs v1.0', W / 2, H - 30, '500 11px "IBM Plex Mono", monospace', Theme.muted);
-    centerText('a tiny OS for the Cheap Yellow Display', W / 2, H - 14, '400 9px "IBM Plex Sans", sans-serif', Theme.muted);
+    roundRect(6, STATUS_H + 4, W - 12, 30, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = S.calcError ? Theme.danger : Theme.text;
+    ctx.font = '600 22px "IBM Plex Mono", monospace'; ctx.textAlign = 'right';
+    ctx.fillText(S.calcDisplay, W - 16, STATUS_H + 24);
+    ctx.textAlign = 'left';
+
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 4; col++) {
+        const label = CALC_KEYS[row][col];
+        const isOp = col === 3 || (row === 3 && col === 0);
+        const x = col * CALC_KEY_W + 2, y = CALC_KEY_TOP + row * CALC_KEY_H + 2;
+        const w = CALC_KEY_W - 4, h = CALC_KEY_H - 4;
+        roundRect(x, y, w, h, 6);
+        ctx.fillStyle = isOp ? Theme.panel2 : Theme.panel; ctx.fill();
+        ctx.fillStyle = (row === 3 && col === 0) ? Theme.danger : (isOp ? Theme.accent : Theme.text);
+        ctx.font = '600 15px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+        ctx.fillText(label, x + w / 2, y + h / 2 + 5);
+        ctx.textAlign = 'left';
+        registerHit(x, y, w, h, function () { calcPressKey(label); });
+      }
+    }
+
+    roundRect(2, CALC_EQ_Y + 2, W - 4, CALC_KEY_H - 4, 6);
+    ctx.fillStyle = Theme.accent; ctx.fill();
+    ctx.fillStyle = Theme.bg; ctx.font = '600 15px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+    ctx.fillText('=', W / 2, CALC_EQ_Y + 2 + (CALC_KEY_H - 4) / 2 + 5);
+    ctx.textAlign = 'left';
+    registerHit(2, CALC_EQ_Y + 2, W - 4, CALC_KEY_H - 4, calcEquals);
+  }
+
+  // ---------- Password Generator ----------
+  const PW_LOWER = 'abcdefghijklmnopqrstuvwxyz';
+  const PW_UPPER = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const PW_DIGITS = '0123456789';
+  const PW_SYMBOLS = '!@#$%^&*-_=+';
+
+  function generatePassword() {
+    let pool = PW_LOWER;
+    if (S.pwUpper) pool += PW_UPPER;
+    if (S.pwDigits) pool += PW_DIGITS;
+    if (S.pwSymbols) pool += PW_SYMBOLS;
+    let out = '';
+    for (let i = 0; i < S.pwLength; i++) out += pool[Math.floor(Math.random() * pool.length)];
+    S.pwValue = out;
+  }
+
+  function drawPasswordSettings() {
+    clearContent();
+    centerText('Length: ' + S.pwLength, W / 2, STATUS_H + 26, '600 14px "IBM Plex Mono", monospace', Theme.text);
+    button(20, STATUS_H + 6, 40, 32, '-', { onTap: function () { S.pwLength = Math.max(6, S.pwLength - 1); } });
+    button(W - 60, STATUS_H + 6, 40, 32, '+', { onTap: function () { S.pwLength = Math.min(32, S.pwLength + 1); } });
+
+    button(10, STATUS_H + 46, 96, 30, 'ABC', { active: S.pwUpper, onTap: function () { S.pwUpper = !S.pwUpper; } });
+    button(112, STATUS_H + 46, 96, 30, '123', { active: S.pwDigits, onTap: function () { S.pwDigits = !S.pwDigits; } });
+    button(214, STATUS_H + 46, 96, 30, '#$%', { active: S.pwSymbols, onTap: function () { S.pwSymbols = !S.pwSymbols; } });
+
+    button(40, STATUS_H + 84, W - 80, 34, 'Generate', { onTap: generatePassword });
+
+    const boxY = STATUS_H + 122;
+    roundRect(10, boxY, W - 20, 34, 6); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = S.pwValue ? Theme.accent : Theme.muted;
+    ctx.font = '500 13px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+    ctx.fillText(S.pwValue || 'tap Generate', W / 2, boxY + 21);
+    ctx.textAlign = 'left';
+
+    if (S.pwValue) {
+      button(40, STATUS_H + 158, W - 80, 30, 'Show as QR', { onTap: function () { S.pwShowing = true; } });
+    }
+  }
+
+  function drawPasswordQr() {
+    clearContent();
+    button(10, STATUS_H + 6, 90, 30, '<- Edit', { onTap: function () { S.pwShowing = false; } });
+    const qr = qrcode(0, 'L');
+    qr.addData(S.pwValue);
+    qr.make();
+    const count = qr.getModuleCount();
+    const areaTop = STATUS_H + 44, areaH = H - areaTop - 6, areaW = W - 12;
+    const px = Math.max(1, Math.floor(Math.min(areaW, areaH) / count));
+    const total = px * count;
+    const ox = (W - total) / 2, oy = areaTop + (areaH - total) / 2;
+    ctx.fillStyle = Theme.text; ctx.fillRect(ox - 4, oy - 4, total + 8, total + 8);
+    ctx.fillStyle = Theme.bg;
+    for (let y = 0; y < count; y++) {
+      for (let x = 0; x < count; x++) {
+        if (qr.isDark(y, x)) ctx.fillRect(ox + x * px, oy + y * px, px, px);
+      }
+    }
+  }
+
+  function drawPassword() { S.pwShowing ? drawPasswordQr() : drawPasswordSettings(); }
+
+  // ---------- Morse Beacon ----------
+  const MORSE_LETTERS = ['.-', '-...', '-.-.', '-..', '.', '..-.', '--.', '....', '..', '.---',
+    '-.-', '.-..', '--', '-.', '---', '.--.', '--.-', '.-.', '...', '-',
+    '..-', '...-', '.--', '-..-', '-.--', '--..'];
+  const MORSE_DIGITS = ['-----', '.----', '..---', '...--', '....-', '.....', '-....', '--...', '---..', '----.'];
+  const MORSE_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+  const MORSE_UNIT = 200;
+
+  function morseFor(c) {
+    if (c >= 'a' && c <= 'z') return MORSE_LETTERS[c.charCodeAt(0) - 97];
+    if (c >= '0' && c <= '9') return MORSE_DIGITS[c.charCodeAt(0) - 48];
+    return null;
+  }
+
+  function buildMorseSchedule(msg) {
+    const steps = [];
+    for (const raw of msg.toLowerCase()) {
+      if (raw === ' ') { steps.push(-MORSE_UNIT * 4); continue; }
+      const code = morseFor(raw);
+      if (!code) continue;
+      for (const sym of code) {
+        steps.push(sym === '.' ? MORSE_UNIT : MORSE_UNIT * 3);
+        steps.push(-MORSE_UNIT);
+      }
+      steps.push(-MORSE_UNIT * 2);
+    }
+    return steps;
+  }
+
+  function startMorseSend(msg) {
+    const schedule = buildMorseSchedule(msg);
+    if (schedule.length === 0) return;
+    S.morseSchedule = schedule;
+    S.morseStep = 0;
+    S.morseStepStart = performance.now();
+    S.morseOn = schedule[0] > 0;
+    S.morseSending = true;
+  }
+
+  function updateMorse(t) {
+    if (!S.morseSending) return;
+    const elapsed = t - S.morseStepStart;
+    if (elapsed >= Math.abs(S.morseSchedule[S.morseStep])) {
+      S.morseStep++;
+      if (S.morseStep >= S.morseSchedule.length) { S.morseSending = false; return; }
+      S.morseStepStart = t;
+      S.morseOn = S.morseSchedule[S.morseStep] > 0;
+    }
+  }
+
+  function drawMorseEdit() {
+    clearContent();
+    roundRect(4, STATUS_H + 2, W - 8, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    const shown = S.morseText.length > 34 ? S.morseText.slice(-34) : S.morseText;
+    ctx.fillStyle = S.morseText ? Theme.text : Theme.muted;
+    ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    ctx.fillText(S.morseText ? shown : 'type a message to flash...', 10, STATUS_H + 15);
+
+    const top = STATUS_H + 30, rowH = 26;
+    MORSE_ROWS.forEach(function (row, r) {
+      const keyW = W / row.length;
+      for (let c = 0; c < row.length; c++) {
+        const x = c * keyW + 1, y = top + r * rowH;
+        const ch = row[c];
+        button(x, y, keyW - 2, rowH - 4, ch, {
+          onTap: function () { if (S.morseText.length < 40) S.morseText += ch; },
+        });
+      }
+    });
+
+    const ctrlY = top + MORSE_ROWS.length * rowH + 4;
+    button(4, ctrlY, 90, 26, 'SPACE', { onTap: function () { if (S.morseText.length < 40) S.morseText += ' '; } });
+    button(98, ctrlY, 80, 26, 'DEL', { onTap: function () { S.morseText = S.morseText.slice(0, -1); } });
+    button(182, ctrlY, 60, 26, 'CLR', { onTap: function () { S.morseText = ''; } });
+    button(246, ctrlY, 70, 26, 'SOS', { onTap: function () { startMorseSend('sos'); } });
+    button(4, ctrlY + 30, W - 8, 30, 'Send', {
+      color: S.morseText ? Theme.panel : Theme.panel2,
+      textColor: S.morseText ? Theme.accent : Theme.muted,
+      onTap: function () { if (S.morseText) startMorseSend(S.morseText); },
+    });
+  }
+
+  function drawMorseSending() {
+    ctx.fillStyle = S.morseOn ? Theme.text : Theme.bg;
+    ctx.fillRect(0, STATUS_H, W, H - STATUS_H);
+    centerText(S.morseText, W / 2, STATUS_H + 30, '600 13px "IBM Plex Mono", monospace', S.morseOn ? Theme.bg : Theme.muted);
+    button(W / 2 - 50, H - 44, 100, 32, 'Stop', { onTap: function () { S.morseSending = false; } });
+  }
+
+  function drawMorse() { S.morseSending ? drawMorseSending() : drawMorseEdit(); }
+
+  // ---------- Settings ----------
+  function drawSettingsMain() {
+    clearContent();
+    centerText('Brightness', W / 2, STATUS_H + 14, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    slider(40, 58, W - 80, 26, S.brightness, function (v) { S.brightness = v; applyBrightness(v); });
+    centerText(S.brightness + '%', W / 2, 94, '600 11px "IBM Plex Mono", monospace', Theme.text);
+
+    button(40, 106, 116, 28, 'Set Time', { onTap: function () { S.settingsMode = 'time'; } });
+    button(164, 106, 116, 28, 'WiFi Setup', { color: Theme.panel2, textColor: Theme.muted });
+    button(40, 140, W - 80, 28, 'Battery Icon: ' + (S.showBattery ? 'ON' : 'OFF'), {
+      onTap: function () { S.showBattery = !S.showBattery; },
+    });
+
+    centerText('CydOs v1.2 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+  }
+
+  function drawSettingsTime() {
+    clearContent();
+    button(10, STATUS_H + 6, 90, 30, '<- Back', { onTap: function () { S.settingsMode = 'main'; } });
+    const secs = Math.floor(S.clockOffsetSec + performance.now() / 1000) % 86400;
+    const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+    const pad = function (n) { return String(n).padStart(2, '0'); };
+    centerText(pad(h) + ':' + pad(m) + ':' + pad(s), W / 2, STATUS_H + 70, '700 30px "IBM Plex Mono", monospace', Theme.accent);
+    button(40, STATUS_H + 110, 40, 34, 'H+', { onTap: function () { S.clockOffsetSec += 3600; } });
+    button(90, STATUS_H + 110, 40, 34, 'H-', { onTap: function () { S.clockOffsetSec -= 3600; } });
+    button(190, STATUS_H + 110, 40, 34, 'M+', { onTap: function () { S.clockOffsetSec += 60; } });
+    button(240, STATUS_H + 110, 40, 34, 'M-', { onTap: function () { S.clockOffsetSec -= 60; } });
+  }
+
+  function drawSettings() {
+    S.settingsMode === 'time' ? drawSettingsTime() : drawSettingsMain();
   }
 
   // ---------- main loop ----------
   const RENDERERS = {
     home: drawHome, wifi: drawWifi, flash: drawFlash, clock: drawClock,
-    qr: drawQr, dice: drawDice, settings: drawSettings,
+    qr: drawQr, dice: drawDice, calc: drawCalc, password: drawPassword,
+    morse: drawMorse, settings: drawSettings,
   };
 
   function render(t) {
@@ -634,6 +966,7 @@
     ctx.clearRect(0, 0, W, H);
     updateClock();
     updateDice(t);
+    updateMorse(t);
     RENDERERS[S.current](t);
     drawStatusBar();
     requestAnimationFrame(render);

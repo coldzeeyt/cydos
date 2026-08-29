@@ -109,6 +109,7 @@
 
   .fileinfo { margin-top: 14px; font-size: 12px; color: var(--muted); letter-spacing: 0.01em; }
   .fileinfo b { color: var(--text); font-weight: 600; }
+  .fileinfo a { color: var(--accent); }
 
   .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px 24px; }
   .panel h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 16px; }
@@ -162,7 +163,8 @@
       <span slot="not-allowed"><strong>Web Serial is blocked.</strong> This page needs to be loaded over https (it is) - check your browser hasn't disabled the Serial permission for it.</span>
     </esp-web-install-button>
 
-    <p class="fileinfo"><b>CydOs.bin</b> &middot; v1.1 &middot; ~1.05 MB &middot; bootloader + partitions + app, flashed at 0x0</p>
+    <p class="fileinfo"><b>CydOs.bin</b> &middot; v1.2 &middot; ~1 MB &middot; bootloader + partitions + app, flashed at 0x0
+      &middot; <a href="firmware/CydOs.bin" download>download the .bin</a> to flash yourself with esptool or Arduino IDE</p>
   </div>
 
   <div class="panel">

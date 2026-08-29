@@ -17,21 +17,35 @@ cloud service required to build or use it.
 - **Flashlight** — full white or full red screen with a brightness slider
   that drives the backlight PWM directly.
 - **Clock** — one app, three tabs: a manually-set clock, a stopwatch, and
-  a countdown timer.
-- **QR Beamer** — type a short message on an on-screen keyboard, beam it
-  as a QR code for another phone to scan.
+  a countdown timer that flashes the screen red/white when it hits zero
+  (no speaker to beep with).
+- **QR Beamer** — type a short message on an on-screen keyboard (letters,
+  digits, and `./:-_@` for URLs), beam it as a QR code for another phone
+  to scan.
 - **Dice** — D6, D20, and coin flip, with a quick roll animation.
-- **Settings** — global brightness (persisted across reboots), WiFi setup
-  (used only for the "New Update!" check-in below), and a touch test
-  screen for calibrating the resistive touch panel.
+- **Calculator** — plain four-function calculator.
+- **Password** — generates a random password (configurable length and
+  character set) and can beam it as a QR code so you don't have to type
+  it in by hand.
+- **Morse** — type a message (or tap the one-button **SOS**) and flash it
+  out in Morse code with the screen - a visual signal for getting
+  someone's attention at a distance.
+- **Settings** — global brightness (persisted across reboots), a manual
+  time set (Clock reads the same clock), a battery-icon show/hide toggle,
+  WiFi setup (used only for the "New Update!" check-in below), and a
+  touch test screen for calibrating the resistive touch panel.
 
 ## Web flasher & browser demo
 
 [**coldzeeyt.github.io/cydproject**](https://coldzeeyt.github.io/cydproject/) —
 flash CydOs onto a CYD straight from Chrome/Edge over Web Serial (no
-Arduino IDE, no esptool), or try the [interactive
+Arduino IDE, no esptool install needed), or try the [interactive
 demo](https://coldzeeyt.github.io/cydproject/demo.html) first, which runs
-the actual launcher and apps in a canvas, no hardware required.
+the actual launcher and apps in a canvas, no hardware required. Prefer to
+flash it yourself with esptool or the Arduino IDE? There's a plain
+[download link for the .bin](https://coldzeeyt.github.io/cydproject/firmware/CydOs.bin)
+on the flasher page too (offset `0x0`, it's the bootloader+partitions+app
+already merged into one file).
 
 This is served from `docs/` via GitHub Pages. If the site above 404s, Pages
 hasn't been turned on yet for this repo — under **Settings → Pages**, set
@@ -120,6 +134,12 @@ pio device monitor      # serial monitor (115200 baud)
 First build downloads the ESP32 toolchain + libraries automatically
 (TFT_eSPI, XPT2046_Touchscreen, QRCode) — no manual library setup needed,
 TFT_eSPI is fully configured via `build_flags` in `platformio.ini`.
+
+Uses the `huge_app.csv` partition table (~3MB for the app, no OTA slot)
+instead of the ESP32 Arduino default, which only gives the app ~1.3MB -
+the WiFi/TLS stack the update checker needs eats into that fast. These
+boards have a full 4MB flash chip and CydOs doesn't need OTA (it's
+flashed whole over USB or the web flasher), so there's no downside.
 
 ## If the screen or touch looks wrong
 

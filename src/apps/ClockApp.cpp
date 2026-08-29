@@ -19,16 +19,20 @@ bool ClockApp::update() {
   bool changed = false;
   if (_tab == CLOCK) changed = true;  // seconds tick, needs redraw ~1/s (cheap to just always mark dirty via draw's own timing)
   if (_tab == STOPWATCH && _swRunning) changed = true;
-  if (_tab == TIMER && _timerRunning) {
-    uint32_t now = millis();
-    uint32_t delta = now - _timerLastTick;
-    _timerLastTick = now;
-    _timerRemainMs -= delta;
-    if (_timerRemainMs <= 0) {
-      _timerRemainMs = 0;
-      _timerRunning = false;
+  if (_tab == TIMER) {
+    if (_timerRunning) {
+      uint32_t now = millis();
+      uint32_t delta = now - _timerLastTick;
+      _timerLastTick = now;
+      _timerRemainMs -= delta;
+      if (_timerRemainMs <= 0) {
+        _timerRemainMs = 0;
+        _timerRunning = false;
+        _alarmUntil = millis() + 1000; // flash red/white for a second - no speaker to beep with
+      }
+      changed = true;
     }
-    changed = true;
+    if (millis() < _alarmUntil) changed = true; // keep flickering the flash until it's done
   }
   if (changed) _dirty = true;
   return _dirty;
@@ -43,7 +47,7 @@ void ClockApp::drawTabs(TFT_eSPI& tft) {
 
 void ClockApp::drawClockTab(TFT_eSPI& tft) {
   tft.fillRect(0, Cfg::STATUS_BAR_H + 32, Cfg::SCREEN_W, Cfg::SCREEN_H - Cfg::STATUS_BAR_H - 32, Theme::BG);
-  uint32_t secSinceMidnight = (_clockOffsetSec + millis() / 1000) % 86400;
+  uint32_t secSinceMidnight = _clock->secondsSinceMidnight();
   uint32_t h = secSinceMidnight / 3600;
   uint32_t m = (secSinceMidnight % 3600) / 60;
   uint32_t s = secSinceMidnight % 60;
@@ -82,6 +86,13 @@ void ClockApp::drawTimerTab(TFT_eSPI& tft) {
   _timerStartStop.label = _timerRunning ? "Pause" : "Start";
   _timerStartStop.draw(tft);
   _timerReset.draw(tft);
+
+  uint32_t now = millis();
+  if (now < _alarmUntil) {
+    bool redPhase = ((_alarmUntil - now) / 125) % 2 == 0;
+    uint16_t flash = UI::blend565(redPhase ? Theme::DANGER : Theme::TEXT, Theme::BG, 0.75f);
+    tft.fillRect(0, Cfg::STATUS_BAR_H, Cfg::SCREEN_W, Cfg::SCREEN_H - Cfg::STATUS_BAR_H, flash);
+  }
 }
 
 void ClockApp::draw(TFT_eSPI& tft) {
@@ -105,12 +116,11 @@ void ClockApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
   }
 
   if (_tab == CLOCK) {
-    if (_hourUp.hit(x, y)) _clockOffsetSec += 3600;
-    else if (_hourDn.hit(x, y)) _clockOffsetSec -= 3600;
-    else if (_minUp.hit(x, y)) _clockOffsetSec += 60;
-    else if (_minDn.hit(x, y)) _clockOffsetSec -= 60;
+    if (_hourUp.hit(x, y)) _clock->addHours(1);
+    else if (_hourDn.hit(x, y)) _clock->addHours(-1);
+    else if (_minUp.hit(x, y)) _clock->addMinutes(1);
+    else if (_minDn.hit(x, y)) _clock->addMinutes(-1);
     else return;
-    _clockOffsetSec = ((_clockOffsetSec % 86400) + 86400) % 86400;
     _dirty = true;
   } else if (_tab == STOPWATCH) {
     if (_swStartStop.hit(x, y)) {

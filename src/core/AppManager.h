@@ -10,7 +10,7 @@
 // active App. Index 0 is always the Home launcher.
 class AppManager {
 public:
-  static constexpr uint8_t MAX_APPS = 8;
+  static constexpr uint8_t MAX_APPS = 12;
 
   void begin(TFT_eSPI& tft, Battery* battery, UpdateChecker* updates = nullptr) {
     _tft = &tft;
@@ -43,6 +43,9 @@ public:
 
   void setBrightnessPercent(uint8_t pct) { _brightnessPct = pct; }
   uint8_t brightnessPercent() const { return _brightnessPct; }
+
+  void setBatteryVisible(bool visible) { _showBattery = visible; }
+  bool batteryVisible() const { return _showBattery; }
 
   void loop(int16_t touchX, int16_t touchY, bool touchDown, bool touchHeld) {
     bool needsRedraw = false;
@@ -128,7 +131,7 @@ public:
     }
 
     // Battery pill, top-right.
-    if (_battery && _battery->available()) {
+    if (_battery && _battery->available() && _showBattery) {
       uint8_t pct = _battery->percent();
       int16_t bw = 30, bh = 14;
       int16_t bx = Cfg::SCREEN_W - bw - 10, by = (Cfg::STATUS_BAR_H - bh) / 2;
@@ -150,6 +153,7 @@ private:
   uint8_t _currentIndex = 0;
   App* _current = nullptr;
   uint8_t _brightnessPct = 80;
+  bool _showBattery = true;
   uint32_t _lastBarRefresh = 0;
   bool _lastHeld = false;
 };
