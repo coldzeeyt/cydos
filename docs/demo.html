@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CydOs Simulator</title>
+<style>
+  :root {
+    --bg: #eef0ec;
+    --ink: #171a16;
+    --muted: #5c6259;
+    --card: #ffffff;
+    --border: rgba(20, 24, 18, 0.12);
+    --accent: #0891a8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14140f;
+      --ink: #eef0ea;
+      --muted: #9a9c8f;
+      --card: #1d1d16;
+      --border: rgba(240, 240, 230, 0.1);
+      --accent: #26d6f0;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14140f;
+    --ink: #eef0ea;
+    --muted: #9a9c8f;
+    --card: #1d1d16;
+    --border: rgba(240, 240, 230, 0.1);
+    --accent: #26d6f0;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    min-height: 100vh; margin: 0; padding: 36px 18px 60px;
+    display: flex; flex-direction: column; align-items: center; gap: 20px;
+  }
+  h1, .mono { font-family: "IBM Plex Mono", ui-monospace, Menlo, monospace; }
+  .head { text-align: center; max-width: 480px; }
+  .eyebrow {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); margin: 0 0 8px;
+  }
+  h1 { font-size: 26px; margin: 0 0 8px; letter-spacing: -0.01em; }
+  .head p { color: var(--muted); font-size: 14px; margin: 0; line-height: 1.5; }
+
+  /* ---- device mockup: fixed identity, same in both themes ---- */
+  .board {
+    background: linear-gradient(160deg, #e9d548, #d9c22f);
+    border-radius: 22px;
+    padding: 22px 22px 30px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.4) inset, 0 18px 40px -18px rgba(0,0,0,0.45);
+    position: relative;
+    touch-action: none;
+  }
+  .board::before {
+    content: ""; position: absolute; top: 10px; left: 10px; width: 9px; height: 9px;
+    border-radius: 50%; background: #00000022; box-shadow: 6px 0 0 #00000022;
+  }
+  .board::after {
+    content: ""; position: absolute; bottom: 10px; right: 10px; width: 9px; height: 9px;
+    border-radius: 50%; background: #00000022; box-shadow: -6px 0 0 #00000022;
+  }
+  .screenframe {
+    background: #0c0c0c; border-radius: 8px; padding: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.05);
+  }
+  canvas {
+    display: block; width: 480px; height: 360px; max-width: 82vw; height: auto;
+    border-radius: 2px; cursor: pointer;
+    image-rendering: -webkit-optimize-contrast;
+  }
+  .usbnub {
+    position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%);
+    width: 46px; height: 12px; background: #8a8a8a; border-radius: 0 0 4px 4px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.3) inset;
+  }
+
+  .note {
+    max-width: 480px; font-size: 12.5px; color: var(--muted); text-align: center; line-height: 1.6;
+  }
+  .note b { color: var(--ink); }
+  .note code {
+    background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px;
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px;
+  }
+  .topnav {
+    width: 100%; max-width: 480px; display: flex; align-items: center; justify-content: space-between;
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 14px; font-family: "IBM Plex Mono", monospace;
+  }
+  .topnav .brand { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 12.5px; }
+  .topnav .brand .dot { width: 7px; height: 7px; border-radius: 50%; background: #16874a; }
+  .topnav nav a {
+    color: var(--muted); text-decoration: none; font-size: 11.5px; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 4px 8px; border-radius: 6px; margin-left: 4px;
+  }
+  .topnav nav a:hover { color: var(--ink); }
+  .topnav nav a.active { color: #04222a; background: var(--accent); }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="topnav">
+  <span class="brand"><span class="dot"></span>CydOs</span>
+  <nav>
+    <a href="index.html">Flash</a>
+    <a href="demo.html" class="active">Demo</a>
+    <a href="https://github.com/coldzeeyt/cydproject">Source</a>
+  </nav>
+</div>
+
+<div class="head">
+  <p class="eyebrow">Browser Preview</p>
+  <h1>CydOs</h1>
+  <p>Click around like you would with a finger on the real screen. This runs the same app logic as the firmware - WiFi Radar uses invented demo networks here since a browser tab can't scan real ones.</p>
+</div>
+
+<div class="board">
+  <div class="screenframe">
+    <canvas id="screen" width="640" height="480"></canvas>
+  </div>
+  <div class="usbnub"></div>
+</div>
+
+<p class="note">Drag sliders, tap tiles, hold the dice's <b>ROLL</b> button. Everything here - the radar sweep, the QR codes, the timers - is the actual CydOs behavior, just running in JS instead of on an ESP32.</p>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(function () {
+  const canvas = document.getElementById('screen');
+  const ctx = canvas.getContext('2d');
+  const W = 320, H = 240, STATUS_H = 26;
+  const SCALE = canvas.width / W;
+
+  const Theme = {
+    bg: '#0b0f16', panel: '#17202b', panel2: '#223142',
+    accent: '#00d9f0', amber: '#ffb020', good: '#22c55e', danger: '#ef4444',
+    text: '#f5f9fc', muted: '#7c8ba0',
+  };
+
+  ctx.scale(SCALE, SCALE);
+  ctx.textBaseline = 'middle';
+
+  // ---------- tiny immediate-mode widget helpers ----------
+  let hitboxes = [];
+  function resetHitboxes() { hitboxes = []; }
+  function hitTest(x, y) {
+    for (let i = hitboxes.length - 1; i >= 0; i--) {
+      const h = hitboxes[i];
+      if (x >= h.x && x <= h.x + h.w && y >= h.y && y <= h.y + h.h) return h;
+    }
+    return null;
+  }
+  function registerHit(x, y, w, h, onDown, onDrag) {
+    hitboxes.push({ x, y, w, h, onDown, onDrag });
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function button(x, y, w, h, label, opts) {
+    opts = opts || {};
+    const active = !!opts.active;
+    const fill = active ? Theme.accent : (opts.color || Theme.panel);
+    const fg = active ? Theme.bg : (opts.textColor || Theme.text);
+    roundRect(x, y, w, h, 6);
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.strokeStyle = Theme.muted; ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = fg;
+    ctx.font = '600 12px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x + w / 2, y + h / 2 + 1);
+    ctx.textAlign = 'left';
+    if (opts.onTap) registerHit(x, y, w, h, opts.onTap);
+  }
+
+  function slider(x, y, w, h, value, onChange) {
+    const trackY = y + h / 2 - 3;
+    roundRect(x, trackY, w, 6, 3); ctx.fillStyle = Theme.panel2; ctx.fill();
+    const fillW = Math.max(0, Math.min(w, (value / 100) * w));
+    if (fillW > 0) { roundRect(x, trackY, fillW, 6, 3); ctx.fillStyle = Theme.accent; ctx.fill(); }
+    const knobX = x + fillW;
+    ctx.beginPath(); ctx.arc(knobX, y + h / 2, 9, 0, Math.PI * 2); ctx.fillStyle = Theme.text; ctx.fill();
+    ctx.beginPath(); ctx.arc(knobX, y + h / 2, 6, 0, Math.PI * 2); ctx.fillStyle = Theme.accent; ctx.fill();
+    if (onChange) {
+      const drag = (px) => onChange(Math.max(0, Math.min(100, Math.round(((px - x) / w) * 100))));
+      registerHit(x - 10, y - 10, w + 20, h + 20, drag, drag);
+    }
+  }
+
+  function centerText(text, cx, cy, font, color) {
+    ctx.font = font; ctx.fillStyle = color;
+    ctx.textAlign = 'center'; ctx.fillText(text, cx, cy);
+    ctx.textAlign = 'left';
+  }
+
+  function clearContent() {
+    ctx.fillStyle = Theme.bg;
+    ctx.fillRect(0, STATUS_H, W, H - STATUS_H);
+  }
+
+  function applyBrightness(pct) {
+    canvas.style.filter = 'brightness(' + (Math.max(15, pct) / 100) + ')';
+  }
+
+  // ---------- icons ----------
+  function iconWifi(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.arc(cx, cy + 6, 6 + i * 7, (210 * Math.PI) / 180, (330 * Math.PI) / 180);
+      ctx.stroke();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy + 6, 2, 0, Math.PI * 2); ctx.fillStyle = c; ctx.fill();
+  }
+  function iconFlash(cx, cy, c) {
+    ctx.fillStyle = c;
+    ctx.beginPath(); ctx.arc(cx, cy, 10, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    for (let a = 0; a < 360; a += 45) {
+      const rad = (a * Math.PI) / 180;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(rad) * 13, cy + Math.sin(rad) * 13);
+      ctx.lineTo(cx + Math.cos(rad) * 18, cy + Math.sin(rad) * 18);
+      ctx.stroke();
+    }
+  }
+  function iconClock(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx, cy - 9); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + 7, cy + 2); ctx.stroke();
+  }
+  function iconQR(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.strokeRect(cx - 14, cy - 14, 12, 12);
+    ctx.strokeRect(cx + 2, cy - 14, 12, 12);
+    ctx.strokeRect(cx - 14, cy + 2, 12, 12);
+    ctx.fillStyle = c;
+    ctx.fillRect(cx + 4, cy + 4, 4, 4);
+    ctx.fillRect(cx + 10, cy + 10, 4, 4);
+  }
+  function iconDice(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    roundRect(cx - 14, cy - 14, 28, 28, 5); ctx.stroke();
+    ctx.fillStyle = c;
+    [[-6, -6], [6, 6], [0, 0]].forEach(function (p) {
+      ctx.beginPath(); ctx.arc(cx + p[0], cy + p[1], 2, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+  function iconGear(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 8, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.stroke();
+    for (let a = 0; a < 360; a += 45) {
+      const rad = (a * Math.PI) / 180;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(rad) * 10, cy + Math.sin(rad) * 10);
+      ctx.lineTo(cx + Math.cos(rad) * 14, cy + Math.sin(rad) * 14);
+      ctx.stroke();
+    }
+  }
+
+  // ---------- shared state ----------
+  const S = {
+    current: 'home',
+    brightness: 80,
+    flashRed: false,
+    flashBrightness: 100,
+    wifi: null,
+    clockTab: 'clock',
+    clockOffsetSec: 12 * 3600,
+    swRunning: false, swStart: 0, swAccum: 0,
+    timerSetSec: 60, timerRemainMs: 60000, timerRunning: false, timerLast: 0,
+    qrText: '', qrShowing: false,
+    diceMode: 0, diceResult: 1, diceRolling: false, diceRollStart: 0, diceLastFlicker: 0,
+  };
+
+  const TILES = [
+    { id: 'wifi', name: 'WiFi Radar', icon: iconWifi },
+    { id: 'flash', name: 'Flashlight', icon: iconFlash },
+    { id: 'clock', name: 'Clock', icon: iconClock },
+    { id: 'qr', name: 'QR Beamer', icon: iconQR },
+    { id: 'dice', name: 'Dice', icon: iconDice },
+    { id: 'settings', name: 'Settings', icon: iconGear },
+  ];
+  const APP_NAMES = {
+    home: 'CydOs', wifi: 'WiFi Radar', flash: 'Flashlight', clock: 'Clock',
+    qr: 'QR Beamer', dice: 'Dice', settings: 'Settings',
+  };
+
+  function openApp(id) {
+    const leavingFlash = S.current === 'flash' && id !== 'flash';
+    S.current = id;
+    if (id === 'wifi') initWifi();
+    if (id === 'flash') { S.flashBrightness = S.brightness; applyBrightness(S.flashBrightness); }
+    if (leavingFlash) applyBrightness(S.brightness);
+    if (id === 'dice') S.diceRolling = false;
+    if (id === 'qr') S.qrShowing = false;
+  }
+
+  function drawHome() {
+    clearContent();
+    const cols = 3, rows = 2;
+    const tw = W / cols, th = (H - STATUS_H) / rows;
+    TILES.forEach(function (tile, i) {
+      const col = i % cols, row = Math.floor(i / cols);
+      const x = col * tw, y = STATUS_H + row * th;
+      ctx.strokeStyle = Theme.panel2; ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, tw - 1, th - 1);
+      const cx = x + tw / 2, cy = y + th / 2 - 8;
+      tile.icon(cx, cy, Theme.accent);
+      centerText(tile.name, cx, y + th - 14, '500 11px "IBM Plex Mono", monospace', Theme.text);
+      registerHit(x, y, tw, th, function () { openApp(tile.id); });
+    });
+  }
+
+  function drawStatusBar() {
+    ctx.fillStyle = Theme.panel; ctx.fillRect(0, 0, W, STATUS_H);
+    ctx.strokeStyle = Theme.muted;
+    ctx.beginPath(); ctx.moveTo(0, STATUS_H - 0.5); ctx.lineTo(W, STATUS_H - 0.5); ctx.stroke();
+
+    let titleX = 8;
+    if (S.current !== 'home') {
+      const bx = 2, by = 2, bw = 22, bh = STATUS_H - 4;
+      roundRect(bx, by, bw, bh, 4); ctx.fillStyle = Theme.panel2; ctx.fill();
+      centerText('<', bx + bw / 2, by + bh / 2 + 1, '600 13px "IBM Plex Mono", monospace', Theme.accent);
+      registerHit(bx, by, bw, bh, function () { openApp('home'); });
+      titleX = bx + bw + 6;
+    }
+    ctx.fillStyle = Theme.text;
+    ctx.font = '500 12px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(APP_NAMES[S.current], titleX, STATUS_H / 2 + 1);
+
+    const bw2 = 30, bh2 = 14, bx2 = W - bw2 - 10, by2 = (STATUS_H - bh2) / 2;
+    ctx.strokeStyle = Theme.muted; ctx.strokeRect(bx2, by2, bw2, bh2);
+    ctx.fillStyle = Theme.muted; ctx.fillRect(bx2 + bw2, by2 + 3, 2, bh2 - 6);
+    ctx.fillStyle = Theme.good; ctx.fillRect(bx2 + 2, by2 + 2, (bw2 - 4) * 0.82, bh2 - 4);
+  }
+
+  // ---------- WiFi Radar (demo data - a browser tab can't scan real WiFi) ----------
+  function initWifi() {
+    const names = ['Netgear_5G', 'Pretty Fly for a WiFi', 'CoffeeShop', 'HomeLAN', 'Sams iPhone', 'ESP-Setup'];
+    S.wifi = {
+      sweep: 0, last: performance.now(), selected: -1,
+      nets: names.map(function (ssid, i) {
+        let hash = 0;
+        for (let k = 0; k < ssid.length; k++) hash = (hash * 31 + ssid.charCodeAt(k)) >>> 0;
+        return {
+          ssid: ssid, channel: [1, 6, 11, 6, 3, 9][i], secure: ssid !== 'ESP-Setup',
+          angle: hash % 360, base: -40 - i * 8, phase: (hash % 628) / 100,
+        };
+      }),
+    };
+  }
+
+  function wifiRssi(net, t) {
+    return net.base + Math.sin(t / 3000 + net.phase) * 12;
+  }
+
+  function drawWifi(t) {
+    clearContent();
+    const cx = W / 2, cy = STATUS_H + (H - STATUS_H) / 2 + 4, radius = 88;
+    const wf = S.wifi;
+    const dt = t - wf.last; wf.last = t;
+    wf.sweep = (wf.sweep + dt * 0.09) % 360;
+
+    ctx.strokeStyle = Theme.panel2;
+    for (let i = 1; i <= 3; i++) { ctx.beginPath(); ctx.arc(cx, cy, radius * i / 3, 0, Math.PI * 2); ctx.stroke(); }
+    ctx.beginPath(); ctx.moveTo(cx - radius, cy); ctx.lineTo(cx + radius, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx, cy - radius); ctx.lineTo(cx, cy + radius); ctx.stroke();
+
+    for (let k = 5; k >= 0; k--) {
+      const rad = ((wf.sweep - k * 5) * Math.PI) / 180;
+      ctx.strokeStyle = k === 0 ? Theme.good : Theme.panel2;
+      ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(rad) * radius, cy + Math.sin(rad) * radius); ctx.stroke();
+    }
+
+    centerText('DEMO DATA - simulated networks', cx, STATUS_H + 10, '500 9px "IBM Plex Mono", monospace', Theme.muted);
+
+    wf.nets.forEach(function (net, i) {
+      const rssi = Math.max(-90, Math.min(-30, wifiRssi(net, t)));
+      const frac = (rssi + 90) / 60;
+      const dist = (radius - 4) + frac * (10 - (radius - 4));
+      const rad = (net.angle * Math.PI) / 180;
+      const bx = cx + Math.cos(rad) * dist, by = cy + Math.sin(rad) * dist;
+      const color = rssi > -55 ? Theme.good : rssi > -75 ? Theme.amber : Theme.danger;
+      const sz = wf.selected === i ? 7 : 5;
+      ctx.beginPath(); ctx.arc(bx, by, sz, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+      ctx.strokeStyle = Theme.text; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.arc(bx, by, sz + 2, 0, Math.PI * 2); ctx.stroke();
+      registerHit(bx - 12, by - 12, 24, 24, function () { wf.selected = wf.selected === i ? -1 : i; });
+    });
+
+    if (wf.selected >= 0) {
+      const net = wf.nets[wf.selected];
+      const rssi = Math.round(Math.max(-90, Math.min(-30, wifiRssi(net, t))));
+      const y = H - 50;
+      ctx.fillStyle = Theme.panel; ctx.fillRect(0, y, W, 50);
+      ctx.strokeStyle = Theme.muted; ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+      ctx.fillStyle = Theme.text; ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+      ctx.fillText(net.ssid, 8, y + 16);
+      ctx.fillStyle = Theme.muted; ctx.font = '500 10px "IBM Plex Mono", monospace';
+      ctx.fillText(rssi + ' dBm  ch ' + net.channel + '  ' + (net.secure ? 'locked' : 'open'), 8, y + 34);
+    }
+  }
+
+  // ---------- Flashlight ----------
+  function drawFlash() {
+    ctx.fillStyle = S.flashRed ? '#ff0000' : '#ffffff';
+    ctx.fillRect(0, STATUS_H, W, H - STATUS_H);
+
+    button(W / 2 - 60, STATUS_H + 10, 120, 34, S.flashRed ? 'Switch: WHITE' : 'Switch: RED', {
+      onTap: function () { S.flashRed = !S.flashRed; },
+    });
+    slider(40, H - 40, W - 80, 30, S.flashBrightness, function (v) { S.flashBrightness = v; applyBrightness(v); });
+    const fg = S.flashRed ? Theme.text : Theme.bg;
+    centerText(S.flashBrightness + '%', W / 2, H - 56, '600 12px "IBM Plex Mono", monospace', fg);
+  }
+
+  // ---------- Clock / Stopwatch / Timer ----------
+  function fmtHMS(totalMs, withMs) {
+    const totalSec = Math.floor(totalMs / 1000);
+    const h = Math.floor(totalSec / 3600), m = Math.floor((totalSec % 3600) / 60), s = totalSec % 60;
+    const pad = function (n) { return String(n).padStart(2, '0'); };
+    if (withMs) {
+      const cs = Math.floor((totalMs % 1000) / 10);
+      return pad(m) + ':' + pad(s) + '.' + pad(cs);
+    }
+    return h > 0 ? pad(h) + ':' + pad(m) + ':' + pad(s) : pad(m) + ':' + pad(s);
+  }
+
+  function drawClock() {
+    clearContent();
+    const tabs = ['clock', 'stopwatch', 'timer'];
+    const labels = { clock: 'Clock', stopwatch: 'Stopwatch', timer: 'Timer' };
+    tabs.forEach(function (tab, i) {
+      button(i * (W / 3), STATUS_H, W / 3, 32, labels[tab], {
+        active: S.clockTab === tab,
+        onTap: function () { S.clockTab = tab; },
+      });
+    });
+
+    if (S.clockTab === 'clock') {
+      const secs = Math.floor(S.clockOffsetSec + performance.now() / 1000) % 86400;
+      const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+      const pad = function (n) { return String(n).padStart(2, '0'); };
+      centerText(pad(h) + ':' + pad(m) + ':' + pad(s), W / 2, 110, '700 34px "IBM Plex Mono", monospace', Theme.accent);
+      centerText('using real system time', W / 2, 145, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    } else if (S.clockTab === 'stopwatch') {
+      const elapsed = S.swAccum + (S.swRunning ? performance.now() - S.swStart : 0);
+      centerText(fmtHMS(elapsed, true), W / 2, 110, '700 34px "IBM Plex Mono", monospace', Theme.accent);
+      button(40, 170, 110, 40, S.swRunning ? 'Stop' : 'Start', {
+        onTap: function () {
+          if (S.swRunning) { S.swAccum += performance.now() - S.swStart; S.swRunning = false; }
+          else { S.swStart = performance.now(); S.swRunning = true; }
+        },
+      });
+      button(170, 170, 110, 40, 'Reset', { onTap: function () { S.swRunning = false; S.swAccum = 0; } });
+    } else {
+      const remain = Math.max(0, S.timerRemainMs);
+      centerText(fmtHMS(remain, false), W / 2, 90, '700 34px "IBM Plex Mono", monospace', remain <= 0 ? Theme.danger : Theme.accent);
+      button(20, 130, 60, 34, '+1m', { onTap: function () { if (!S.timerRunning) { S.timerSetSec += 60; S.timerRemainMs = S.timerSetSec * 1000; } } });
+      button(90, 130, 60, 34, '-1m', { onTap: function () { if (!S.timerRunning) { S.timerSetSec = Math.max(10, S.timerSetSec - 60); S.timerRemainMs = S.timerSetSec * 1000; } } });
+      button(170, 130, 60, 34, '+10s', { onTap: function () { if (!S.timerRunning) { S.timerSetSec += 10; S.timerRemainMs = S.timerSetSec * 1000; } } });
+      button(240, 130, 60, 34, '-10s', { onTap: function () { if (!S.timerRunning) { S.timerSetSec = Math.max(10, S.timerSetSec - 10); S.timerRemainMs = S.timerSetSec * 1000; } } });
+      button(40, 175, 110, 36, S.timerRunning ? 'Pause' : 'Start', {
+        onTap: function () {
+          if (S.timerRunning) { S.timerRunning = false; }
+          else { S.timerRunning = true; S.timerLast = performance.now(); }
+        },
+      });
+      button(170, 175, 110, 36, 'Reset', { onTap: function () { S.timerRunning = false; S.timerRemainMs = S.timerSetSec * 1000; } });
+    }
+  }
+
+  function updateClock() {
+    if (S.clockTab === 'timer' && S.timerRunning) {
+      const now = performance.now();
+      S.timerRemainMs -= now - S.timerLast;
+      S.timerLast = now;
+      if (S.timerRemainMs <= 0) { S.timerRemainMs = 0; S.timerRunning = false; }
+    }
+  }
+
+  // ---------- QR Beamer ----------
+  const KB_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm'];
+
+  function drawQrKeyboard() {
+    clearContent();
+    roundRect(4, STATUS_H + 2, W - 8, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    const shown = S.qrText.length > 34 ? S.qrText.slice(-34) : S.qrText;
+    ctx.fillStyle = S.qrText ? Theme.text : Theme.muted;
+    ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    ctx.fillText(S.qrText ? shown : 'type a message...', 10, STATUS_H + 15);
+
+    const top = STATUS_H + 30, rowH = 26;
+    KB_ROWS.forEach(function (row, r) {
+      const keyW = W / row.length;
+      for (let c = 0; c < row.length; c++) {
+        const x = c * keyW + 1, y = top + r * rowH;
+        const ch = row[c];
+        button(x, y, keyW - 2, rowH - 4, ch, {
+          onTap: function () { if (S.qrText.length < 100) S.qrText += ch; },
+        });
+      }
+    });
+
+    const ctrlY = top + KB_ROWS.length * rowH + 4;
+    button(4, ctrlY, 100, 26, 'SPACE', { onTap: function () { if (S.qrText.length < 100) S.qrText += ' '; } });
+    button(108, ctrlY, 90, 26, 'DEL', { onTap: function () { S.qrText = S.qrText.slice(0, -1); } });
+    button(202, ctrlY, 54, 26, 'CLR', { onTap: function () { S.qrText = ''; } });
+    button(4, ctrlY + 30, W - 8, 28, 'Generate QR ->', {
+      color: S.qrText ? Theme.panel : Theme.panel2,
+      textColor: S.qrText ? Theme.accent : Theme.muted,
+      onTap: function () { if (S.qrText) S.qrShowing = true; },
+    });
+  }
+
+  function drawQrCode() {
+    clearContent();
+    button(10, STATUS_H + 6, 90, 30, '<- Edit', { onTap: function () { S.qrShowing = false; } });
+
+    const qr = qrcode(0, 'L');
+    qr.addData(S.qrText);
+    qr.make();
+    const count = qr.getModuleCount();
+    const areaTop = STATUS_H + 44, areaH = H - areaTop - 6, areaW = W - 12;
+    const px = Math.max(1, Math.floor(Math.min(areaW, areaH) / count));
+    const total = px * count;
+    const ox = (W - total) / 2, oy = areaTop + (areaH - total) / 2;
+
+    ctx.fillStyle = Theme.text; ctx.fillRect(ox - 4, oy - 4, total + 8, total + 8);
+    ctx.fillStyle = Theme.bg;
+    for (let y = 0; y < count; y++) {
+      for (let x = 0; x < count; x++) {
+        if (qr.isDark(y, x)) ctx.fillRect(ox + x * px, oy + y * px, px, px);
+      }
+    }
+  }
+
+  function drawQr() { S.qrShowing ? drawQrCode() : drawQrKeyboard(); }
+
+  // ---------- Dice ----------
+  const DICE_MODES = ['D6', 'D20', 'Coin'];
+  const PIP_MAP = {
+    1: [[0, 0]], 2: [[-1, -1], [1, 1]], 3: [[-1, -1], [0, 0], [1, 1]],
+    4: [[-1, -1], [1, -1], [-1, 1], [1, 1]],
+    5: [[-1, -1], [1, -1], [0, 0], [-1, 1], [1, 1]],
+    6: [[-1, -1], [1, -1], [-1, 0], [1, 0], [-1, 1], [1, 1]],
+  };
+
+  function drawDicePips(cx, cy, size, value) {
+    roundRect(cx - size, cy - size, size * 2, size * 2, 12);
+    ctx.fillStyle = Theme.text; ctx.fill();
+    ctx.strokeStyle = Theme.muted; ctx.stroke();
+    const off = size / 2, r = 5;
+    (PIP_MAP[value] || []).forEach(function (p) {
+      ctx.beginPath(); ctx.arc(cx + p[0] * off, cy + p[1] * off, r, 0, Math.PI * 2);
+      ctx.fillStyle = Theme.bg; ctx.fill();
+    });
+  }
+
+  function rollDice() {
+    S.diceRolling = true; S.diceRollStart = performance.now(); S.diceLastFlicker = 0;
+  }
+
+  function updateDice(t) {
+    if (!S.diceRolling) return;
+    if (t - S.diceLastFlicker > 60) {
+      S.diceLastFlicker = t;
+      if (S.diceMode === 0) S.diceResult = 1 + Math.floor(Math.random() * 6);
+      else if (S.diceMode === 1) S.diceResult = 1 + Math.floor(Math.random() * 20);
+      else S.diceResult = Math.floor(Math.random() * 2);
+    }
+    if (t - S.diceRollStart > 700) S.diceRolling = false;
+  }
+
+  function drawDice() {
+    clearContent();
+    button(10, STATUS_H + 10, 130, 34, 'Mode: ' + DICE_MODES[S.diceMode], {
+      onTap: function () { if (!S.diceRolling) S.diceMode = (S.diceMode + 1) % 3; },
+    });
+    button(170, STATUS_H + 10, 140, 34, S.diceRolling ? '...' : 'ROLL', {
+      onTap: function () { if (!S.diceRolling) rollDice(); },
+    });
+
+    const cx = W / 2, cy = STATUS_H + 130;
+    if (S.diceMode === 0) {
+      drawDicePips(cx, cy, 55, S.diceResult);
+    } else if (S.diceMode === 1) {
+      ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.fillStyle = Theme.accent; ctx.fill();
+      centerText(String(S.diceResult), cx, cy + 2, '700 30px "IBM Plex Mono", monospace', Theme.bg);
+    } else {
+      const heads = S.diceResult === 0;
+      ctx.beginPath(); ctx.arc(cx, cy, 60, 0, Math.PI * 2); ctx.fillStyle = heads ? Theme.amber : Theme.muted; ctx.fill();
+      centerText(heads ? 'HEADS' : 'TAILS', cx, cy + 2, '700 16px "IBM Plex Mono", monospace', Theme.bg);
+    }
+  }
+
+  // ---------- Settings ----------
+  function drawSettings() {
+    clearContent();
+    centerText('Brightness', W / 2, 50, '500 11px "IBM Plex Mono", monospace', Theme.muted);
+    slider(40, 70, W - 80, 30, S.brightness, function (v) { S.brightness = v; applyBrightness(v); });
+    centerText(S.brightness + '%', W / 2, 110, '600 12px "IBM Plex Mono", monospace', Theme.text);
+    centerText('CydOs v1.0', W / 2, H - 30, '500 11px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('a tiny OS for the Cheap Yellow Display', W / 2, H - 14, '400 9px "IBM Plex Sans", sans-serif', Theme.muted);
+  }
+
+  // ---------- main loop ----------
+  const RENDERERS = {
+    home: drawHome, wifi: drawWifi, flash: drawFlash, clock: drawClock,
+    qr: drawQr, dice: drawDice, settings: drawSettings,
+  };
+
+  function render(t) {
+    resetHitboxes();
+    ctx.clearRect(0, 0, W, H);
+    updateClock();
+    updateDice(t);
+    RENDERERS[S.current](t);
+    drawStatusBar();
+    requestAnimationFrame(render);
+  }
+
+  function toCanvasCoords(clientX, clientY) {
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((clientX - rect.left) / rect.width) * W,
+      y: ((clientY - rect.top) / rect.height) * H,
+    };
+  }
+
+  let activeHit = null;
+  function pointerDown(clientX, clientY) {
+    const p = toCanvasCoords(clientX, clientY);
+    const h = hitTest(p.x, p.y);
+    if (h) { activeHit = h; if (h.onDown) h.onDown(p.x, p.y); }
+  }
+  function pointerMove(clientX, clientY) {
+    if (!activeHit) return;
+    const p = toCanvasCoords(clientX, clientY);
+    if (activeHit.onDrag) activeHit.onDrag(p.x, p.y);
+  }
+  function pointerUp() { activeHit = null; }
+
+  canvas.addEventListener('mousedown', function (e) { pointerDown(e.clientX, e.clientY); });
+  window.addEventListener('mousemove', function (e) { pointerMove(e.clientX, e.clientY); });
+  window.addEventListener('mouseup', pointerUp);
+  canvas.addEventListener('touchstart', function (e) { e.preventDefault(); const t0 = e.touches[0]; pointerDown(t0.clientX, t0.clientY); }, { passive: false });
+  canvas.addEventListener('touchmove', function (e) { e.preventDefault(); const t0 = e.touches[0]; pointerMove(t0.clientX, t0.clientY); }, { passive: false });
+  canvas.addEventListener('touchend', function (e) { e.preventDefault(); pointerUp(); }, { passive: false });
+
+  applyBrightness(S.brightness);
+  requestAnimationFrame(render);
+})();
+</script>
+</body>
+</html>

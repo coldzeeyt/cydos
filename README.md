@@ -20,6 +20,22 @@ built with PlatformIO + Arduino.
 - **Settings** — global brightness (persisted across reboots) and a touch
   test screen for calibrating the resistive touch panel.
 
+## Web flasher & browser demo
+
+[**coldzeeyt.github.io/cydproject**](https://coldzeeyt.github.io/cydproject/) —
+flash CydOs onto a CYD straight from Chrome/Edge over Web Serial (no
+Arduino IDE, no esptool), or try the [interactive
+demo](https://coldzeeyt.github.io/cydproject/demo.html) first, which runs
+the actual launcher and apps in a canvas, no hardware required.
+
+This is served from `docs/` via GitHub Pages. If the site above 404s, Pages
+hasn't been turned on yet for this repo — under **Settings → Pages**, set
+Source to "Deploy from a branch" and pick this branch with the `/docs`
+folder. `docs/firmware/CydOs.bin` is a merged image (bootloader +
+partitions + app in one file, built from `pio run` and
+`esptool.py merge_bin`); rebuild and copy it there after firmware changes,
+or the web flasher will keep serving stale firmware.
+
 ## Hardware
 
 Targets the common **ESP32-2432S028R** CYD board (ILI9341 320x240 SPI
@@ -72,6 +88,7 @@ include/Config.h        all hardware pins & tunables - start here
 src/main.cpp             boot + app registration
 src/core/                display/touch/battery drivers, UI toolkit, app manager
 src/apps/                one file (or header+cpp) per app
+docs/                    GitHub Pages site: web flasher (index.html) + browser demo (demo.html)
 ```
 
 Adding a new app: implement the `App` interface in `src/apps/`, register

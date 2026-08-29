@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CydOs Flasher</title>
+<style>
+  :root {
+    --bg: #f3f6f8;
+    --grain: rgba(20, 34, 46, 0.035);
+    --panel: #ffffff;
+    --panel-2: #eaeff3;
+    --border: rgba(18, 30, 40, 0.12);
+    --text: #101820;
+    --muted: #5c6c7a;
+    --accent: #0891a8;
+    --accent-soft: rgba(8, 145, 168, 0.12);
+    --accent-ink: #ffffff;
+    --amber: #a8660a;
+    --good: #16874a;
+    --danger: #c22a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #090d13;
+      --grain: rgba(120, 200, 220, 0.035);
+      --panel: #121a24;
+      --panel-2: #1a2530;
+      --border: rgba(200, 225, 240, 0.1);
+      --text: #eaf2f8;
+      --muted: #7f8fa3;
+      --accent: #26d6f0;
+      --accent-soft: rgba(38, 214, 240, 0.14);
+      --accent-ink: #04222a;
+      --amber: #ffb020;
+      --good: #34d399;
+      --danger: #ff8080;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #090d13;
+    --grain: rgba(120, 200, 220, 0.035);
+    --panel: #121a24;
+    --panel-2: #1a2530;
+    --border: rgba(200, 225, 240, 0.1);
+    --text: #eaf2f8;
+    --muted: #7f8fa3;
+    --accent: #26d6f0;
+    --accent-soft: rgba(38, 214, 240, 0.14);
+    --accent-ink: #04222a;
+    --amber: #ffb020;
+    --good: #34d399;
+    --danger: #ff8080;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background:
+      repeating-linear-gradient(0deg, var(--grain) 0px, var(--grain) 1px, transparent 1px, transparent 3px),
+      var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    line-height: 1.55;
+    min-height: 100vh;
+    margin: 0;
+    padding: 40px 20px 64px;
+  }
+  h1, h2, .mono, .eyebrow, .num, .devicebar, .fileinfo, code { font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+  .wrap { max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+
+  .devicebar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 14px; font-size: 12.5px; letter-spacing: 0.04em; color: var(--muted);
+  }
+  .devicebar .brand { color: var(--text); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .devicebar .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .devicebar nav a {
+    color: var(--muted); text-decoration: none; font-size: 11.5px; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 4px 8px; border-radius: 6px;
+  }
+  .devicebar nav a:hover { color: var(--text); background: var(--panel-2); }
+  .devicebar nav a.active { color: var(--accent-ink); background: var(--accent); }
+
+  .hero { text-align: left; }
+  .eyebrow {
+    display: inline-block; font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em;
+    color: var(--accent); text-transform: uppercase; margin: 0 0 10px;
+  }
+  h1 { font-size: clamp(30px, 6vw, 40px); font-weight: 700; margin: 0 0 12px; letter-spacing: -0.01em; text-wrap: balance; }
+  .lede { color: var(--muted); font-size: 15.5px; max-width: 46ch; margin: 0 0 24px; }
+
+  esp-web-install-button { display: block; }
+  .install-btn {
+    appearance: none; border: none; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink);
+    font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 15px; letter-spacing: 0.01em;
+    padding: 15px 22px; border-radius: 10px; display: inline-flex; align-items: center; gap: 10px;
+    box-shadow: 0 1px 0 rgba(0,0,0,0.08), 0 8px 20px -10px var(--accent);
+    transition: transform 120ms ease, box-shadow 120ms ease;
+  }
+  .install-btn:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(0,0,0,0.08), 0 12px 24px -10px var(--accent); }
+  .install-btn:active { transform: translateY(0); }
+  .install-btn .arrow { transition: transform 120ms ease; }
+  .install-btn:hover .arrow { transform: translateX(3px); }
+
+  .notice { font-size: 13.5px; color: var(--muted); border: 1px dashed var(--border); border-radius: 8px; padding: 12px 14px; max-width: 46ch; }
+  .notice strong { color: var(--text); }
+
+  .fileinfo { margin-top: 14px; font-size: 12px; color: var(--muted); letter-spacing: 0.01em; }
+  .fileinfo b { color: var(--text); font-weight: 600; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px 24px; }
+  .panel h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 16px; }
+  ol.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  ol.steps li { display: flex; gap: 14px; align-items: baseline; }
+  ol.steps .num {
+    flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--panel-2);
+    border: 1px solid var(--border); color: var(--accent); font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.steps div { font-size: 14.5px; }
+  ol.steps strong { font-weight: 600; }
+
+  details { font-size: 14px; color: var(--muted); }
+  details summary { cursor: pointer; color: var(--text); font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+  details p { margin: 10px 0; }
+  details code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 12.5px; color: var(--text); }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; font-size: 13px; margin: 14px 0 0; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; color: var(--text); }
+
+  footer { text-align: center; font-size: 12px; color: var(--muted); padding-top: 8px; }
+  footer a { color: var(--accent); }
+
+  @media (prefers-reduced-motion: reduce) { .install-btn, .install-btn .arrow { transition: none; } }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="wrap">
+  <div class="devicebar">
+    <span class="brand"><span class="dot"></span>CydOs</span>
+    <nav>
+      <a href="index.html" class="active">Flash</a>
+      <a href="demo.html">Demo</a>
+      <a href="https://github.com/coldzeeyt/cydproject">Source</a>
+    </nav>
+  </div>
+
+  <div class="hero">
+    <p class="eyebrow">Cheap Yellow Display &middot; ESP32-2432S028R</p>
+    <h1>Flash CydOs in one click</h1>
+    <p class="lede">Puts the full multitool - WiFi radar, flashlight, clock, QR beamer, dice - on your board straight from this tab. No Arduino IDE, no esptool install, no drag-and-drop.</p>
+
+    <esp-web-install-button manifest="manifest.json">
+      <button slot="activate" class="install-btn" type="button">Install CydOs <span class="arrow">&rarr;</span></button>
+      <span slot="unsupported" class="notice"><strong>This browser can't do it.</strong> Web Serial only works in Chrome or Edge on a desktop computer - open this page there instead.</span>
+      <span slot="not-allowed"><strong>Web Serial is blocked.</strong> This page needs to be loaded over https (it is) - check your browser hasn't disabled the Serial permission for it.</span>
+    </esp-web-install-button>
+
+    <p class="fileinfo"><b>CydOs.bin</b> &middot; ~872 KB &middot; bootloader + partitions + app, flashed at 0x0</p>
+  </div>
+
+  <div class="panel">
+    <h2>Before you click Install</h2>
+    <ol class="steps">
+      <li><span class="num">1</span><div><strong>Plug in the CYD</strong> over USB to this computer - most use a Micro-USB or USB-C port on the board itself.</div></li>
+      <li><span class="num">2</span><div><strong>Pick the port</strong> when the browser asks - it'll show up as something like "CP2104" or "CH340".</div></li>
+      <li><span class="num">3</span><div><strong>Leave it alone</strong> while it erases and writes. Fifteen to thirty seconds, don't unplug it or touch the screen.</div></li>
+      <li><span class="num">4</span><div>It reboots straight into the <strong>CydOs</strong> home screen when it's done.</div></li>
+    </ol>
+  </div>
+
+  <div class="panel">
+    <h2>Board not showing up?</h2>
+    <details>
+      <summary>No serial port appears in the browser prompt</summary>
+      <p>Almost always a missing USB driver for the board's serial chip - install one, then reload this page and try again:</p>
+      <p>&middot; CP2104/CP2102 chip &rarr; <code>Silicon Labs CP210x driver</code><br>&middot; CH340 chip &rarr; <code>WCH CH340 driver</code></p>
+      <p>Also worth checking: the USB cable is a data cable, not a charge-only one, and no other program (Arduino IDE's Serial Monitor, PlatformIO) is holding the port open.</p>
+    </details>
+  </div>
+
+  <div class="panel">
+    <h2>Not ready to flash yet?</h2>
+    <p style="margin:0; font-size: 14.5px; color: var(--muted);">Try the <a href="demo.html" style="color: var(--accent); font-weight: 600;">interactive demo</a> first - it runs the same launcher and apps in your browser, no hardware required.</p>
+  </div>
+
+  <footer>Flashing runs locally in your browser over Web Serial - nothing is uploaded anywhere. &middot; <a href="https://github.com/coldzeeyt/cydproject">View source</a></footer>
+</div>
+
+<script type="module" src="https://cdn.jsdelivr.net/npm/esp-web-tools@10/dist/web/install-button.js"></script>
+</body>
+</html>

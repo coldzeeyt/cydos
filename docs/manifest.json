@@ -1,0 +1,12 @@
+{
+  "name": "CydOs",
+  "version": "1.0.0",
+  "builds": [
+    {
+      "chipFamily": "ESP32",
+      "parts": [
+        { "path": "firmware/CydOs.bin", "offset": 0 }
+      ]
+    }
+  ]
+}

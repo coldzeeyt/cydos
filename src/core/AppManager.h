@@ -62,13 +62,16 @@ public:
 
     if (needsRedraw && _current) {
       _current->draw(*_tft);
-      // Battery/clock in the status bar changes slowly; refresh it
-      // periodically rather than every single frame.
-      uint32_t now = millis();
-      if (now - _lastBarRefresh > 1000) {
-        drawStatusBar();
-        _lastBarRefresh = now;
-      }
+    }
+
+    // Refresh the battery pill on a timer, independent of whether the
+    // current app redrew - otherwise it freezes at whatever it read when
+    // the app opened for as long as you leave an idle screen (e.g. Home)
+    // on screen without touching it.
+    uint32_t now = millis();
+    if (now - _lastBarRefresh > 1000) {
+      drawStatusBar();
+      _lastBarRefresh = now;
     }
   }
 
