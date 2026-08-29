@@ -65,7 +65,7 @@ constexpr const char* WIFI_PASSWORD = "";
 // a "New Update!" banner if it's newer than CYDOS_VERSION (Version.h). A
 // device with no WiFi configured, or that's out of range, just never checks
 // in and never sees the banner until it's next online.
-constexpr const char* UPDATE_CHECK_URL = "https://coldzeeyt.github.io/cydproject/version.json";
+constexpr const char* UPDATE_CHECK_URL = "https://coldzeeyt.github.io/cydos/version.json";
 constexpr uint32_t UPDATE_CHECK_INTERVAL_MS = 20UL * 60UL * 1000UL; // 20 minutes
 constexpr uint32_t UPDATE_CHECK_BOOT_DELAY_MS = 8000; // let the UI settle before the first check
 

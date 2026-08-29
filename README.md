@@ -41,13 +41,13 @@ cloud service required to build or use it.
 
 ## Web flasher & browser demo
 
-[**coldzeeyt.github.io/cydproject**](https://coldzeeyt.github.io/cydproject/) —
+[**coldzeeyt.github.io/cydos**](https://coldzeeyt.github.io/cydos/) —
 flash CydOs onto a CYD straight from Chrome/Edge over Web Serial (no
 Arduino IDE, no esptool install needed), or try the [interactive
-demo](https://coldzeeyt.github.io/cydproject/demo.html) first, which runs
+demo](https://coldzeeyt.github.io/cydos/demo.html) first, which runs
 the actual launcher and apps in a canvas, no hardware required. Prefer to
 flash it yourself with esptool or the Arduino IDE? There's a plain
-[download link for the .bin](https://coldzeeyt.github.io/cydproject/firmware/CydOs.bin)
+[download link for the .bin](https://coldzeeyt.github.io/cydos/firmware/CydOs.bin)
 on the flasher page too (offset `0x0`, it's the bootloader+partitions+app
 already merged into one file).
 
