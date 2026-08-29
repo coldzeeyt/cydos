@@ -8,6 +8,7 @@
 #include "core/Battery.h"
 #include "core/Display.h"
 #include "core/AppManager.h"
+#include "core/UpdateChecker.h"
 
 #include "apps/HomeApp.h"
 #include "apps/WifiRadarApp.h"
@@ -22,6 +23,7 @@ Touch touch;
 Battery battery;
 AppManager appManager;
 Preferences prefs;
+UpdateChecker updateChecker;
 
 HomeApp homeApp(&appManager);
 WifiRadarApp wifiApp;
@@ -29,7 +31,7 @@ FlashlightApp flashApp(&appManager);
 ClockApp clockApp;
 QrBeamerApp qrApp;
 DiceApp diceApp;
-SettingsApp settingsApp(&appManager, &touch);
+SettingsApp settingsApp(&appManager, &touch, &prefs, &updateChecker);
 
 uint8_t g_lastSavedBrightness = 80;
 uint32_t g_lastBrightnessCheck = 0;
@@ -52,7 +54,8 @@ void setup() {
   battery.begin();
   randomSeed(esp_random());
 
-  appManager.begin(tft, &battery);
+  updateChecker.begin(&prefs);
+  appManager.begin(tft, &battery, &updateChecker);
   appManager.setBrightnessPercent(savedBrightness);
 
   uint8_t homeIdx = appManager.registerApp(&homeApp);
@@ -84,6 +87,12 @@ void loop() {
   if (touched) { lastX = x; lastY = y; }
   appManager.loop(lastX, lastY, pressStart, touched);
   wasDown = touched;
+
+  // Don't let a periodic update check steal the WiFi radio out from under
+  // an active scan in the WiFi Radar app.
+  if (appManager.currentApp() != &wifiApp) {
+    updateChecker.update();
+  }
 
   // Persist brightness to flash, but not on every tiny slider move.
   uint32_t now = millis();

@@ -4,6 +4,10 @@ A tiny, fast "operating system" for the ESP32-2432S028R **Cheap Yellow
 Display** (CYD) — a home screen you tap to launch small full-screen apps,
 built with PlatformIO + Arduino.
 
+**Open source, MIT licensed** (see [`LICENSE`](LICENSE)) — fork it, wire it
+up differently, add your own app, send a PR. No account, subscription, or
+cloud service required to build or use it.
+
 ## Apps
 
 - **WiFi Radar** — sweeping radar view of nearby networks. Each SSID gets
@@ -17,8 +21,9 @@ built with PlatformIO + Arduino.
 - **QR Beamer** — type a short message on an on-screen keyboard, beam it
   as a QR code for another phone to scan.
 - **Dice** — D6, D20, and coin flip, with a quick roll animation.
-- **Settings** — global brightness (persisted across reboots) and a touch
-  test screen for calibrating the resistive touch panel.
+- **Settings** — global brightness (persisted across reboots), WiFi setup
+  (used only for the "New Update!" check-in below), and a touch test
+  screen for calibrating the resistive touch panel.
 
 ## Web flasher & browser demo
 
@@ -36,12 +41,58 @@ partitions + app in one file, built from `pio run` and
 `esptool.py merge_bin`); rebuild and copy it there after firmware changes,
 or the web flasher will keep serving stale firmware.
 
+## "New Update!" notifications
+
+Every CYD running CydOs can optionally check in and flag when a newer
+version exists — a small amber **NEW: v1.2** badge appears in the status
+bar on every screen; tap it to dismiss.
+
+There's no server pushing anything. Each device that has WiFi configured
+polls `docs/version.json` on the GitHub Pages site every 20 minutes (and
+once shortly after boot), compares it to the version it was built with
+(`include/Version.h`), and raises the badge if the site's version is
+newer. A device with no WiFi set up, or one that's out of range, simply
+never checks in — which is the whole mechanism for "only the ones that
+are online get notified": nothing is tracking or targeting devices, they
+each independently pull.
+
+**To set up WiFi on a device:** Settings → WiFi Setup → tap the SSID/password
+fields to type on the on-screen keyboard (letters, digits, and `-_.@!` —
+for anything else, e.g. uppercase or other symbols, hardcode
+`Cfg::WIFI_SSID` / `Cfg::WIFI_PASSWORD` in `include/Config.h` before
+flashing instead) → **Save**. **Test Now** forces an immediate check-in so
+you can confirm it's working without waiting.
+
+**To cut a release that notifies everyone:**
+1. Bump `CYDOS_VERSION` in `include/Version.h` (e.g. `"1.2"`) and make
+   your firmware changes.
+2. Build, flash your own board, confirm it's good.
+3. Bump the version in `docs/version.json` to match and push — this is
+   the actual trigger. Every CydOs device that checks in from now on will
+   see it's out of date and raise the badge.
+4. Rebuild `docs/firmware/CydOs.bin` too (see below) so the web flasher
+   serves the new version to anyone who goes looking after seeing the badge.
+
+Two things worth knowing: WiFi credentials are stored as plaintext in
+flash (fine for a hobby multitool on your own network, don't reuse a
+sensitive password); and the HTTPS request skips certificate validation
+(`WiFiClientSecure::setInsecure()`) since it's only ever reading a small
+public version file, not worth pinning a cert for.
+
 ## Hardware
 
 Targets the common **ESP32-2432S028R** CYD board (ILI9341 320x240 SPI
 display + XPT2046 resistive touch, ESP32-WROOM-32). All pin numbers live
 in `include/Config.h` — check that file first if your board revision
 wires things differently.
+
+### Parts used
+
+- [CYD board (ELEGOO 2.8" ESP32 touch display, ILI9341, USB-C)](https://www.amazon.com/dp/B0FJQ6RK39)
+- [3.7V LiPo battery, 3000mAh, JST connector](https://www.amazon.com/dp/B0FH9BLZWB) — check the
+  connector matches your board (or your divider wiring) before ordering.
+
+Neither link is sponsored — just what's in the build this was written against.
 
 ### Battery (your own addition)
 
@@ -88,7 +139,8 @@ include/Config.h        all hardware pins & tunables - start here
 src/main.cpp             boot + app registration
 src/core/                display/touch/battery drivers, UI toolkit, app manager
 src/apps/                one file (or header+cpp) per app
-docs/                    GitHub Pages site: web flasher (index.html) + browser demo (demo.html)
+docs/                    GitHub Pages site: web flasher (index.html), browser demo (demo.html),
+                         version.json (the "New Update!" trigger - see above)
 ```
 
 Adding a new app: implement the `App` interface in `src/apps/`, register

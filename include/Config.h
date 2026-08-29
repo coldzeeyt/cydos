@@ -51,4 +51,22 @@ constexpr float BATTERY_ADC_VREF = 3.3f;
 constexpr float BATTERY_EMPTY_V = 3.3f;
 constexpr float BATTERY_FULL_V = 4.2f;
 
+// ---- WiFi (only used for the "New Update!" check-in - see UpdateChecker) ----
+// Easiest option: hardcode your network here before flashing. Whatever you
+// set on-device via Settings > WiFi Setup is saved to flash and always
+// wins over these, so it's also fine to leave these blank and enter your
+// network on the device instead.
+constexpr const char* WIFI_SSID = "";
+constexpr const char* WIFI_PASSWORD = "";
+
+// ---- Update checker ----
+// Every UPDATE_CHECK_INTERVAL_MS, if WiFi credentials are set, CydOs briefly
+// connects and fetches this URL - a tiny {"version":"x.y"} file - and shows
+// a "New Update!" banner if it's newer than CYDOS_VERSION (Version.h). A
+// device with no WiFi configured, or that's out of range, just never checks
+// in and never sees the banner until it's next online.
+constexpr const char* UPDATE_CHECK_URL = "https://coldzeeyt.github.io/cydproject/version.json";
+constexpr uint32_t UPDATE_CHECK_INTERVAL_MS = 20UL * 60UL * 1000UL; // 20 minutes
+constexpr uint32_t UPDATE_CHECK_BOOT_DELAY_MS = 8000; // let the UI settle before the first check
+
 } // namespace Cfg
