@@ -20,6 +20,7 @@
 #include "apps/CalculatorApp.h"
 #include "apps/PasswordGenApp.h"
 #include "apps/MorseBeaconApp.h"
+#include "apps/BrowserApp.h"
 #include "apps/SettingsApp.h"
 
 TFT_eSPI tft;
@@ -39,6 +40,7 @@ DiceApp diceApp;
 CalculatorApp calcApp;
 PasswordGenApp passwordApp;
 MorseBeaconApp morseApp;
+BrowserApp browserApp(&prefs);
 SettingsApp settingsApp(&appManager, &touch, &prefs, &updateChecker, &wallClock);
 
 uint8_t g_lastSavedBrightness = 80;
@@ -76,6 +78,7 @@ void setup() {
   uint8_t calcIdx = appManager.registerApp(&calcApp);
   uint8_t passwordIdx = appManager.registerApp(&passwordApp);
   uint8_t morseIdx = appManager.registerApp(&morseApp);
+  uint8_t browserIdx = appManager.registerApp(&browserApp);
   uint8_t settingsIdx = appManager.registerApp(&settingsApp);
 
   homeApp.addTile(UI::iconWifi, wifiIdx);
@@ -86,6 +89,7 @@ void setup() {
   homeApp.addTile(UI::iconCalc, calcIdx);
   homeApp.addTile(UI::iconKey, passwordIdx);
   homeApp.addTile(UI::iconMorse, morseIdx);
+  homeApp.addTile(UI::iconGlobe, browserIdx);
   homeApp.addTile(UI::iconGear, settingsIdx);
 
   appManager.openApp(homeIdx);
@@ -104,8 +108,8 @@ void loop() {
   wasDown = touched;
 
   // Don't let a periodic update check steal the WiFi radio out from under
-  // an active scan in the WiFi Radar app.
-  if (appManager.currentApp() != &wifiApp) {
+  // an active scan in WiFi Radar, or collide with Browser's own fetch.
+  if (appManager.currentApp() != &wifiApp && appManager.currentApp() != &browserApp) {
     updateChecker.update();
   }
 

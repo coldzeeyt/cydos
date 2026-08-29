@@ -168,5 +168,10 @@ inline void iconMorse(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.fillRoundRect(cx - 5, cy - 3, 12, 6, 2, c);
   tft.fillCircle(cx + 12, cy, 3, c);
 }
+inline void iconGlobe(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.drawCircle(cx, cy, 14, c);
+  tft.drawEllipse(cx, cy, 6, 14, c);
+  tft.drawFastHLine(cx - 14, cy, 28, c);
+}
 
 } // namespace UI

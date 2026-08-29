@@ -314,6 +314,12 @@
     roundRect(cx - 5, cy - 3, 12, 6, 2); ctx.fill();
     ctx.beginPath(); ctx.arc(cx + 12, cy, 3, 0, Math.PI * 2); ctx.fill();
   }
+  function iconGlobe(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 14, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(cx, cy, 6, 14, 0, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 14, cy); ctx.lineTo(cx + 14, cy); ctx.stroke();
+  }
 
   // ---------- shared state ----------
   const S = {
@@ -334,6 +340,8 @@
     showBattery: true,
     settingsMode: 'main',
     timerAlarmUntil: 0,
+    browserMode: 'url', browserUrl: 'example.com', browserLoading: false,
+    browserLines: [], browserScroll: 0, browserLinesVisible: 0,
   };
 
   const TILES = [
@@ -345,12 +353,13 @@
     { id: 'calc', name: 'Calculator', icon: iconCalc },
     { id: 'password', name: 'Password', icon: iconKey },
     { id: 'morse', name: 'Morse', icon: iconMorse },
+    { id: 'browser', name: 'Browser', icon: iconGlobe },
     { id: 'settings', name: 'Settings', icon: iconGear },
   ];
   const APP_NAMES = {
     home: 'CydOs', wifi: 'WiFi Radar', flash: 'Flashlight', clock: 'Clock',
     qr: 'QR Beamer', dice: 'Dice', calc: 'Calculator', password: 'Password',
-    morse: 'Morse', settings: 'Settings',
+    morse: 'Morse', browser: 'Browser', settings: 'Settings',
   };
 
   function openApp(id) {
@@ -363,12 +372,13 @@
     if (id === 'qr') S.qrShowing = false;
     if (id === 'password') S.pwShowing = false;
     if (id === 'morse') S.morseSending = false;
+    if (id === 'browser') { S.browserMode = 'url'; S.browserLoading = false; }
     if (id === 'settings') S.settingsMode = 'main';
   }
 
   function drawHome() {
     clearContent();
-    const cols = 3, rows = 3;
+    const cols = 3, rows = Math.ceil(TILES.length / cols);
     const tw = W / cols, th = (H - STATUS_H) / rows;
     TILES.forEach(function (tile, i) {
       const col = i % cols, row = Math.floor(i / cols);
@@ -934,7 +944,7 @@
       onTap: function () { S.showBattery = !S.showBattery; },
     });
 
-    centerText('CydOs v1.2 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('CydOs v1.3 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
   }
 
   function drawSettingsTime() {
@@ -954,11 +964,145 @@
     S.settingsMode === 'time' ? drawSettingsTime() : drawSettingsMain();
   }
 
+  // ---------- Browser ----------
+  // Uses a real fetch() - unlike WiFi Radar this can actually work here,
+  // but most sites block cross-origin requests (CORS), which the real
+  // firmware has no such restriction against. When that happens we say so
+  // rather than faking a result.
+  const BROWSER_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm', './:-_?=&'];
+  const BROWSER_CHARS_PER_LINE = 50;
+  const BROWSER_LINE_H = 14;
+
+  function stripHtml(html) {
+    return html
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|li|tr|h1|h2|h3)>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;/gi, "'")
+      .replace(/[^\x20-\x7e\n]/g, '')
+      .replace(/[ \t]+/g, ' ')
+      .replace(/ *\n */g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  function wrapBrowserText(text) {
+    const lines = [];
+    text.split('\n').forEach(function (para) {
+      if (para.length === 0) { lines.push(''); return; }
+      let start = 0;
+      while (start < para.length) {
+        let end = Math.min(start + BROWSER_CHARS_PER_LINE, para.length);
+        if (end < para.length) {
+          const lastSpace = para.lastIndexOf(' ', end);
+          if (lastSpace > start) end = lastSpace;
+        }
+        lines.push(para.slice(start, end));
+        start = (para[end] === ' ') ? end + 1 : end;
+      }
+    });
+    S.browserLines = lines;
+    S.browserScroll = 0;
+  }
+
+  function fetchBrowserUrl() {
+    let url = S.browserUrl;
+    if (url.indexOf('://') === -1) url = 'https://' + url;
+    S.browserLoading = true;
+    S.browserMode = 'page';
+    wrapBrowserText('Loading ' + url + ' ...');
+    fetch(url, { mode: 'cors' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('server responded with ' + r.status);
+        return r.text();
+      })
+      .then(function (html) {
+        S.browserLoading = false;
+        wrapBrowserText(stripHtml(html) || '(no readable text on this page)');
+      })
+      .catch(function (err) {
+        S.browserLoading = false;
+        wrapBrowserText(
+          "Couldn't load that page in the browser demo (" + err.message + ").\n\n" +
+          'This is almost always the browser itself blocking cross-site requests (CORS) - ' +
+          'the real CydOs firmware has no such restriction and can fetch most pages directly.'
+        );
+      });
+  }
+
+  function drawBrowserUrl() {
+    clearContent();
+    roundRect(4, STATUS_H + 2, W - 8, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = Theme.text; ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    const shown = S.browserUrl.length > 34 ? S.browserUrl.slice(-34) : S.browserUrl;
+    ctx.fillText(shown, 10, STATUS_H + 15);
+
+    const top = STATUS_H + 30, rowH = 24;
+    BROWSER_ROWS.forEach(function (row, r) {
+      const keyW = W / row.length;
+      for (let c = 0; c < row.length; c++) {
+        const x = c * keyW + 1, y = top + r * rowH;
+        const ch = row[c];
+        button(x, y, keyW - 2, rowH - 4, ch, {
+          onTap: function () { if (S.browserUrl.length < 96) S.browserUrl += ch; },
+        });
+      }
+    });
+
+    const ctrlY = top + BROWSER_ROWS.length * rowH + 4;
+    button(4, ctrlY, 100, 26, 'DEL', { onTap: function () { S.browserUrl = S.browserUrl.slice(0, -1); } });
+    button(108, ctrlY, 90, 26, 'CLR', { onTap: function () { S.browserUrl = ''; } });
+    button(202, ctrlY, 114, 26, 'Go', {
+      color: S.browserUrl ? Theme.panel : Theme.panel2,
+      textColor: S.browserUrl ? Theme.accent : Theme.muted,
+      onTap: function () { if (S.browserUrl) fetchBrowserUrl(); },
+    });
+  }
+
+  function drawBrowserPage() {
+    clearContent();
+    button(4, STATUS_H + 3, 66, 22, '<-URL', { onTap: function () { S.browserMode = 'url'; } });
+
+    const top = STATUS_H + 30;
+    S.browserLinesVisible = Math.floor((H - top) / BROWSER_LINE_H);
+    ctx.fillStyle = Theme.text; ctx.font = '400 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    for (let i = 0; i < S.browserLinesVisible; i++) {
+      const li = S.browserScroll + i;
+      if (li < 0 || li >= S.browserLines.length) break;
+      ctx.fillText(S.browserLines[li], 8, top + i * BROWSER_LINE_H + 10);
+    }
+
+    if (S.browserLines.length > S.browserLinesVisible) {
+      const trackH = H - top;
+      const thumbH = Math.max(10, trackH * S.browserLinesVisible / S.browserLines.length);
+      const maxScroll = Math.max(1, S.browserLines.length - S.browserLinesVisible);
+      const thumbY = top + (trackH - thumbH) * S.browserScroll / maxScroll;
+      ctx.fillStyle = Theme.panel2; ctx.fillRect(W - 4, thumbY, 3, thumbH);
+    }
+
+    const maxScroll = Math.max(0, S.browserLines.length - S.browserLinesVisible);
+    registerHit(0, top, W, H - top,
+      function (px, py) { S.browserDragStartY = py; S.browserDragStartScroll = S.browserScroll; },
+      function (px, py) {
+        const deltaLines = Math.round(-(py - S.browserDragStartY) / BROWSER_LINE_H);
+        S.browserScroll = Math.max(0, Math.min(maxScroll, S.browserDragStartScroll + deltaLines));
+      });
+  }
+
+  function drawBrowser() { S.browserMode === 'url' ? drawBrowserUrl() : drawBrowserPage(); }
+
   // ---------- main loop ----------
   const RENDERERS = {
     home: drawHome, wifi: drawWifi, flash: drawFlash, clock: drawClock,
     qr: drawQr, dice: drawDice, calc: drawCalc, password: drawPassword,
-    morse: drawMorse, settings: drawSettings,
+    morse: drawMorse, browser: drawBrowser, settings: drawSettings,
   };
 
   function render(t) {

@@ -30,6 +30,10 @@ cloud service required to build or use it.
 - **Morse** — type a message (or tap the one-button **SOS**) and flash it
   out in Morse code with the screen - a visual signal for getting
   someone's attention at a distance.
+- **Browser** — a "browser" in the loosest sense: type a URL, it fetches
+  the page over WiFi, strips every tag, and shows whatever text is left,
+  word-wrapped and scrollable. No CSS, no images, no JS - just enough to
+  read an article or check a status page from a 320x240 screen.
 - **Settings** — global brightness (persisted across reboots), a manual
   time set (Clock reads the same clock), a battery-icon show/hide toggle,
   WiFi setup (used only for the "New Update!" check-in below), and a
