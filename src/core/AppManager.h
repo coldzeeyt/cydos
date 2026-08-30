@@ -10,7 +10,7 @@
 // active App. Index 0 is always the Home launcher.
 class AppManager {
 public:
-  static constexpr uint8_t MAX_APPS = 12;
+  static constexpr uint8_t MAX_APPS = 16;
 
   void begin(TFT_eSPI& tft, Battery* battery, UpdateChecker* updates = nullptr) {
     _tft = &tft;

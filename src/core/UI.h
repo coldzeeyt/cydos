@@ -173,5 +173,11 @@ inline void iconGlobe(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.drawEllipse(cx, cy, 6, 14, c);
   tft.drawFastHLine(cx - 14, cy, 28, c);
 }
+inline void iconBroadcast(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.drawRoundRect(cx - 15, cy - 9, 30, 22, 3, c);
+  tft.fillTriangle(cx - 5, cy - 6, cx - 5, cy + 7, cx + 6, cy + 1, c);
+  tft.drawLine(cx - 8, cy - 9, cx - 14, cy - 16, c);
+  tft.drawLine(cx + 8, cy - 9, cx + 14, cy - 16, c);
+}
 
 } // namespace UI

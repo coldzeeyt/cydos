@@ -320,6 +320,14 @@
     ctx.beginPath(); ctx.ellipse(cx, cy, 6, 14, 0, 0, Math.PI * 2); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx - 14, cy); ctx.lineTo(cx + 14, cy); ctx.stroke();
   }
+  function iconBroadcast(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    roundRect(cx - 15, cy - 9, 30, 22, 3); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 5, cy - 6); ctx.lineTo(cx - 5, cy + 7); ctx.lineTo(cx + 6, cy + 1); ctx.closePath();
+    ctx.fillStyle = c; ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx - 8, cy - 9); ctx.lineTo(cx - 14, cy - 16); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 8, cy - 9); ctx.lineTo(cx + 14, cy - 16); ctx.stroke();
+  }
 
   // ---------- shared state ----------
   const S = {
@@ -343,6 +351,7 @@
     browserMode: 'url', browserUrl: 'example.com', browserLoading: false,
     browserLines: [], browserScroll: 0, browserLinesVisible: 0,
     homePage: 0, homeDragStartX: 0, homeDragStartY: 0, homeDragOffsetX: 0, homeIsSwipe: false, homeDragging: false,
+    obsMode: 'hostEdit', obsHost: '', obsScenes: [], obsFeedbackIdx: -1, obsFeedbackOk: true, obsFeedbackUntil: 0,
   };
 
   const TILES = [
@@ -355,12 +364,13 @@
     { id: 'password', name: 'Password', icon: iconKey },
     { id: 'morse', name: 'Morse', icon: iconMorse },
     { id: 'browser', name: 'Browser', icon: iconGlobe },
+    { id: 'obs', name: 'OBS', icon: iconBroadcast },
     { id: 'settings', name: 'Settings', icon: iconGear },
   ];
   const APP_NAMES = {
     home: 'CydOs', wifi: 'WiFi Radar', flash: 'Flashlight', clock: 'Clock',
     qr: 'QR Beamer', dice: 'Dice', calc: 'Calculator', password: 'Password',
-    morse: 'Morse', browser: 'Browser', settings: 'Settings',
+    morse: 'Morse', browser: 'Browser', obs: 'OBS', settings: 'Settings',
   };
 
   function openApp(id) {
@@ -374,6 +384,7 @@
     if (id === 'password') S.pwShowing = false;
     if (id === 'morse') S.morseSending = false;
     if (id === 'browser') { S.browserMode = 'url'; S.browserLoading = false; }
+    if (id === 'obs') { S.obsMode = S.obsHost ? 'grid' : 'hostEdit'; S.obsFeedbackIdx = -1; }
     if (id === 'settings') S.settingsMode = 'main';
   }
 
@@ -999,6 +1010,90 @@
 
   function drawMorse() { S.morseSending ? drawMorseSending() : drawMorseEdit(); }
 
+  // ---------- OBS scene switcher ----------
+  // On the real device this fetches ["scene","names",...] from the
+  // cydos_scene_switcher.py OBS script over plain HTTP on your LAN, then
+  // sends the real name back on tap. A page served over https (like this
+  // one) can't make that request itself - browsers block "mixed content"
+  // outright, no CORS workaround possible - so "Sync" here just loads a
+  // sample scene list to show what it looks like with real names.
+  const OBS_COLS = 3, OBS_ROWS = 3, OBS_NUM_SCENES = OBS_COLS * OBS_ROWS, OBS_GRID_TOP_GAP = 26;
+  const OBS_KB_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm', '.:-'];
+  const OBS_DEMO_SCENES = ['Starting Soon', 'Gameplay', 'Just Chatting', 'BRB', 'Ending'];
+
+  function obsSceneRect(i) {
+    const col = i % OBS_COLS, row = Math.floor(i / OBS_COLS);
+    const top = STATUS_H + OBS_GRID_TOP_GAP;
+    const tw = W / OBS_COLS, th = (H - top) / OBS_ROWS;
+    return { x: col * tw, y: top + row * th, w: tw, h: th };
+  }
+
+  function obsSendScene(i) {
+    S.obsFeedbackIdx = i;
+    S.obsFeedbackOk = true;
+    S.obsFeedbackUntil = performance.now() + 600;
+  }
+
+  function updateObs() {
+    if (S.obsFeedbackIdx >= 0 && performance.now() > S.obsFeedbackUntil) S.obsFeedbackIdx = -1;
+  }
+
+  function drawObsGrid() {
+    clearContent();
+    ctx.fillStyle = S.obsHost ? Theme.muted : Theme.danger;
+    ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    ctx.fillText(S.obsHost || 'no companion host set', 8, STATUS_H + 13);
+    button(W - 118, STATUS_H + 2, 52, 22, 'Sync', { onTap: function () { S.obsScenes = OBS_DEMO_SCENES.slice(); } });
+    button(W - 62, STATUS_H + 2, 56, 22, 'Edit', { onTap: function () { S.obsMode = 'hostEdit'; } });
+
+    for (let i = 0; i < OBS_NUM_SCENES; i++) {
+      const cell = obsSceneRect(i);
+      const pad = 5;
+      const x = cell.x + pad, y = cell.y + pad, w = cell.w - pad * 2, h = cell.h - pad * 2;
+      let border = Theme.panel2;
+      if (i === S.obsFeedbackIdx) border = S.obsFeedbackOk ? Theme.good : Theme.danger;
+      roundRect(x, y, w, h, 8); ctx.fillStyle = Theme.panel; ctx.fill();
+      ctx.strokeStyle = border; ctx.lineWidth = 1; ctx.stroke();
+      const name = S.obsScenes[i];
+      if (name) {
+        centerText(name, x + w / 2, y + h / 2 + 1, '500 10px "IBM Plex Mono", monospace', Theme.text);
+      } else {
+        centerText(String(i + 1), x + w / 2, y + h / 2 + 1, '600 22px "IBM Plex Mono", monospace', Theme.muted);
+      }
+      registerHit(x, y, w, h, function () { obsSendScene(i); });
+    }
+
+    centerText('DEMO - tap Sync for sample names, taps always "succeed"', W / 2, H - 6, '400 8px "IBM Plex Mono", monospace', Theme.muted);
+  }
+
+  function drawObsHostEdit() {
+    clearContent();
+    roundRect(4, STATUS_H + 2, W - 8, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = S.obsHost ? Theme.text : Theme.muted;
+    ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    const shown = S.obsHost.length > 34 ? S.obsHost.slice(-34) : S.obsHost;
+    ctx.fillText(S.obsHost ? shown : 'host:port, e.g. 192.168.1.50:8088', 10, STATUS_H + 15);
+
+    const top = STATUS_H + 30, rowH = 24;
+    OBS_KB_ROWS.forEach(function (row, r) {
+      const keyW = W / row.length;
+      for (let c = 0; c < row.length; c++) {
+        const x = c * keyW + 1, y = top + r * rowH;
+        const ch = row[c];
+        button(x, y, keyW - 2, rowH - 4, ch, {
+          onTap: function () { if (S.obsHost.length < 64) S.obsHost += ch; },
+        });
+      }
+    });
+
+    const ctrlY = top + OBS_KB_ROWS.length * rowH + 4;
+    button(4, ctrlY, 100, 26, 'DEL', { onTap: function () { S.obsHost = S.obsHost.slice(0, -1); } });
+    button(108, ctrlY, 90, 26, 'CLR', { onTap: function () { S.obsHost = ''; } });
+    button(202, ctrlY, 114, 26, 'Done', { onTap: function () { S.obsMode = 'grid'; } });
+  }
+
+  function drawObs() { S.obsMode === 'hostEdit' ? drawObsHostEdit() : drawObsGrid(); }
+
   // ---------- Settings ----------
   function drawSettingsMain() {
     clearContent();
@@ -1012,7 +1107,7 @@
       onTap: function () { S.showBattery = !S.showBattery; },
     });
 
-    centerText('CydOs v1.5 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('CydOs v1.6 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
   }
 
   function drawSettingsTime() {
@@ -1170,7 +1265,7 @@
   const RENDERERS = {
     home: drawHome, wifi: drawWifi, flash: drawFlash, clock: drawClock,
     qr: drawQr, dice: drawDice, calc: drawCalc, password: drawPassword,
-    morse: drawMorse, browser: drawBrowser, settings: drawSettings,
+    morse: drawMorse, browser: drawBrowser, obs: drawObs, settings: drawSettings,
   };
 
   function render(t) {
@@ -1179,6 +1274,7 @@
     updateClock();
     updateDice(t);
     updateMorse(t);
+    updateObs();
     RENDERERS[S.current](t);
     drawStatusBar();
     requestAnimationFrame(render);

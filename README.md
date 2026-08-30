@@ -39,6 +39,10 @@ same gesture the rest of the launcher uses to tell a tap from a drag.
   the page over WiFi, strips every tag, and shows whatever text is left,
   word-wrapped and scrollable. No CSS, no images, no JS - just enough to
   read an article or check a status page from a 320x240 screen.
+- **OBS** — a 3x3 grid of your real OBS scenes, wired up to a companion
+  script that runs inside OBS itself (see [OBS scene switcher](#obs-scene-switcher)
+  below). Tap a tile to switch scenes live; the grid shows your actual
+  scene names once synced.
 - **Settings** — global brightness (persisted across reboots), a manual
   time set (Clock reads the same clock), a battery-icon show/hide toggle,
   WiFi setup (used only for the "New Update!" check-in below), and a
@@ -63,6 +67,32 @@ folder. `docs/firmware/CydOs.bin` is a merged image (bootloader +
 partitions + app in one file, built from `pio run` and
 `esptool.py merge_bin`); rebuild and copy it there after firmware changes,
 or the web flasher will keep serving stale firmware.
+
+## OBS scene switcher
+
+The OBS app talks directly to a small Python script that runs inside OBS
+itself — no separate program to install or keep running, and no compiled
+plugin to build:
+
+1. In OBS: **Tools → Scripts → +** and add
+   [`obs-script/cydos_scene_switcher.py`](obs-script/cydos_scene_switcher.py).
+2. Set the **Port** field if you don't want the default `8088`.
+3. That's it — the script starts a tiny local HTTP server for as long as
+   OBS and the script are loaded:
+   - `GET /scenes` → JSON array of your scene names.
+   - `GET /switch?scene=Name` → switches to that scene (or pass a 1-based
+     number instead of a name).
+4. On the CYD, open the **OBS** app, tap **Edit**, and type your PC's LAN
+   IP and port (e.g. `192.168.1.50:8088`) on the on-screen keyboard, then
+   **Done**. Tap **Sync** to pull your real scene names into the grid.
+5. Tap any tile to switch OBS to that scene — a green border confirms it
+   worked, red means the request failed (wrong host, OBS closed, script
+   not running, etc).
+
+No authentication, so only run it on a network you trust — it's meant for
+your own LAN, don't port-forward the port. The CYD only talks to it while
+the OBS app is open (WiFi connects on entering the app, disconnects on
+leaving), so it doesn't fight the "New Update!" WiFi check-in below.
 
 ## "New Update!" notifications
 
@@ -170,6 +200,7 @@ src/core/                display/touch/battery drivers, UI toolkit, app manager
 src/apps/                one file (or header+cpp) per app
 docs/                    GitHub Pages site: web flasher (index.html), browser demo (demo.html),
                          version.json (the "New Update!" trigger - see above)
+obs-script/              cydos_scene_switcher.py - the OBS-side companion script (see above)
 ```
 
 Adding a new app: implement the `App` interface in `src/apps/`, register
