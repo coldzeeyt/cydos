@@ -194,6 +194,13 @@ inline void iconFolder(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.fillRoundRect(cx - 15, cy - 8, 12, 6, 2, c);
   tft.drawRoundRect(cx - 15, cy - 4, 30, 18, 2, c);
 }
+inline void iconStore(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.drawLine(cx - 14, cy - 6, cx - 10, cy - 16, c);
+  tft.drawLine(cx + 14, cy - 6, cx + 10, cy - 16, c);
+  tft.drawLine(cx - 10, cy - 16, cx + 10, cy - 16, c);
+  tft.drawRoundRect(cx - 14, cy - 6, 28, 20, 3, c);
+  tft.fillRect(cx - 4, cy + 4, 8, 10, c);
+}
 inline void iconDiag(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.drawRoundRect(cx - 15, cy - 12, 30, 20, 2, c);
   tft.fillRect(cx - 11, cy - 8, 8, 8, c);

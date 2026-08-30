@@ -71,19 +71,27 @@ same gesture the rest of the launcher uses to tell a tap from a drag.
   **Display** (solid red/green/blue/white/black fills, a checkerboard for
   catching a stuck pixel a solid fill would hide, and grayscale/RGB
   gradients for spotting color banding - tap anywhere to cycle), **Touch**
-  (a live crosshair under your finger), and **Info** (chip, free memory,
-  uptime, SD card size, battery voltage).
+  (a live crosshair under your finger, plus the same raw ADC readout as
+  Settings' Touch Test), and **Info** (chip/CPU, reset reason, heap and
+  sketch space, flash size, uptime, SD card size, battery voltage, WiFi
+  status).
+- **App Store** — every Community Edition app (see below) lands here as
+  one shared 3x3 grid instead of each claiming its own top-level Home
+  tile. Shows an empty state with a link to the store site until you've
+  flashed a Community Edition build with something in it.
 
 ## Lock Screen
 
 Off by default. Turn it on in **Settings → Lock Screen** and the next
 time you power on the device, it boots straight to a lock screen (time +
 "Double-tap to unlock") instead of Home — two taps anywhere unlock it for
-the rest of that session. It doesn't re-lock when you go back to Home
-from an app; this is a "keep it off your screen at a glance" feature, not
-a security boundary — there's no PIN, and anyone can unlock it the same
-way you do. Flipping the setting takes effect on the next boot, not
-immediately, so turning it on from inside Settings can't lock you out of
+the rest of that session. It shows your current wallpaper (see
+**Settings → Wallpapers** above) behind the clock, same as Home. It doesn't
+re-lock when you go back to Home from an app; this is a "keep it off your
+screen at a glance" feature, not a security boundary — there's no PIN,
+and anyone can unlock it the same way you do. Flipping the setting takes
+effect on the next boot, not immediately, so turning it on from inside
+Settings can't lock you out of
 Settings itself.
 
 ## Web flasher & browser demo
@@ -132,6 +140,9 @@ Community Edition reads files straight off the card, no reflash needed.
   reviews and merges it, and CI automatically bakes every merged app into
   a separate, opt-in **Community Edition** firmware you flash like
   normal. The official `CydOs.bin` above never changes because of this.
+  On the device, every Community Edition app shows up together inside the
+  **App Store** Home tile (see the Apps section above) rather than each
+  claiming its own top-level tile.
 
 Everything here is empty until someone submits the first one. See
 [`CONTRIBUTING.md`](CONTRIBUTING.md) for the exact `.cydapp` field
@@ -201,6 +212,17 @@ it keeps running in the background) rather than something you load
 inside another app. The **Spotify** app also has its own **?** help
 button (on both the host-entry screen and the now-playing screen) with
 this same walkthrough, in case you're setting it up away from a computer.
+
+**Before you start:** you need Python installed on the PC that'll run the
+script (not the CYD) - any Python **3.9 or newer** works, unlike OBS's
+bundled scripting console above, since this runs as your own standalone
+script with no OBS version constraint.
+- **Windows**: [python.org/downloads/windows](https://www.python.org/downloads/windows/)
+  → grab the latest **"Windows installer (64-bit)"** under Stable
+  Releases. During install, check **"Add python.exe to PATH"** on the
+  first screen, or the `python3` command below won't be found.
+- **macOS**: already has Python 3 on modern versions, or `brew install python3`.
+- **Linux**: already installed on virtually every distro (`python3 --version` to check).
 
 **One-time setup:**
 

@@ -5,6 +5,7 @@
 #include "Battery.h"
 #include "UpdateChecker.h"
 #include "WallClock.h"
+#include "Wallpaper.h"
 #include "apps/App.h"
 
 // Owns the status bar (title, battery, back-to-home) and switches the
@@ -200,14 +201,41 @@ private:
   void drawLockScreen() {
     TFT_eSPI& tft = *_tft;
     tft.fillScreen(Theme::BG);
+    // Wallpaper::draw() only paints y >= STATUS_BAR_H (it's sized for the
+    // content area below Home's status bar) - the top strip stays flat
+    // Theme::BG, which reads fine as a thin top margin on a lock screen
+    // that has no status bar of its own.
+    Wallpaper::draw(tft);
+
+    // Flat panels behind each text block instead of UI::centerText's
+    // usual trick (opaque text drawn straight onto a hardcoded Theme::BG
+    // background) - that trick punches a Theme::BG-colored box behind
+    // every glyph, which looks broken once there's a real photo behind it
+    // instead of a flat color.
     if (_lockClock) {
       uint32_t s = _lockClock->secondsSinceMidnight();
       char buf[6];
       snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)((s / 3600) % 24), (unsigned)((s / 60) % 60));
-      UI::centerText(tft, buf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H / 2 - 20, 7, Theme::ACCENT);
+      tft.fillRoundRect(Cfg::SCREEN_W / 2 - 70, Cfg::SCREEN_H / 2 - 46, 140, 60, 10, Theme::PANEL);
+      tft.setTextDatum(MC_DATUM);
+      tft.setTextColor(Theme::ACCENT);
+      tft.drawString(buf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H / 2 - 20, 7);
+      tft.setTextColor(Theme::MUTED);
+      tft.drawString("CydOs", Cfg::SCREEN_W / 2, Cfg::SCREEN_H / 2 + 6, 2);
+      tft.setTextDatum(TL_DATUM);
+    } else {
+      tft.fillRoundRect(Cfg::SCREEN_W / 2 - 50, Cfg::SCREEN_H / 2 - 16, 100, 32, 8, Theme::PANEL);
+      tft.setTextDatum(MC_DATUM);
+      tft.setTextColor(Theme::MUTED);
+      tft.drawString("CydOs", Cfg::SCREEN_W / 2, Cfg::SCREEN_H / 2, 2);
+      tft.setTextDatum(TL_DATUM);
     }
-    UI::centerText(tft, "CydOs", Cfg::SCREEN_W / 2, Cfg::SCREEN_H / 2 + (_lockClock ? 26 : -6), 2, Theme::MUTED);
-    UI::centerText(tft, "Double-tap to unlock", Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 30, 2, Theme::ACCENT);
+
+    tft.fillRoundRect(Cfg::SCREEN_W / 2 - 90, Cfg::SCREEN_H - 46, 180, 26, 8, Theme::PANEL);
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(Theme::ACCENT);
+    tft.drawString("Double-tap to unlock", Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 33, 2);
+    tft.setTextDatum(TL_DATUM);
   }
 
   TFT_eSPI* _tft = nullptr;

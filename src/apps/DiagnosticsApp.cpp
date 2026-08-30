@@ -1,8 +1,29 @@
 #include "DiagnosticsApp.h"
 #include "core/Battery.h"
 #include "core/SdCard.h"
+#include "core/Touch.h"
 #include <Arduino.h>
 #include <SD.h>
+#include <esp_system.h>
+#include <WiFi.h>
+
+// Short human labels for esp_reset_reason() - useful for spotting a crash
+// loop (PANIC/task or interrupt watchdog) versus a normal power cycle.
+static const char* resetReasonName() {
+  switch (esp_reset_reason()) {
+    case ESP_RST_POWERON: return "Power-on";
+    case ESP_RST_EXT: return "External pin";
+    case ESP_RST_SW: return "Software";
+    case ESP_RST_PANIC: return "Panic/crash";
+    case ESP_RST_INT_WDT: return "Interrupt watchdog";
+    case ESP_RST_TASK_WDT: return "Task watchdog";
+    case ESP_RST_WDT: return "Other watchdog";
+    case ESP_RST_DEEPSLEEP: return "Deep sleep wake";
+    case ESP_RST_BROWNOUT: return "Brownout";
+    case ESP_RST_SDIO: return "SDIO";
+    default: return "Unknown";
+  }
+}
 
 const char* const DiagnosticsApp::TAB_NAMES[DiagnosticsApp::TAB_COUNT] = {"Display", "Touch", "Info"};
 const char* const DiagnosticsApp::PATTERN_NAMES[DiagnosticsApp::PATTERN_COUNT] = {
@@ -29,6 +50,7 @@ void DiagnosticsApp::onEnter(TFT_eSPI& tft) {
   _tab = TAB_DISPLAY;
   _pattern = 0;
   _touchX = _touchY = -1;
+  _touchRawX = _touchRawY = -1;
   updateTitle();
   _dirty = true;
 }
@@ -100,15 +122,21 @@ void DiagnosticsApp::drawTouchPage(TFT_eSPI& tft) {
     tft.drawFastHLine(0, _touchY, Cfg::SCREEN_W, Theme::PANEL2);
     tft.drawFastVLine(_touchX, y0, Cfg::SCREEN_H - y0, Theme::PANEL2);
     tft.fillCircle(_touchX, _touchY, 6, Theme::ACCENT);
-    char buf[24];
-    snprintf(buf, sizeof(buf), "%d, %d", _touchX, _touchY);
-    UI::centerText(tft, buf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 16, 1, Theme::TEXT);
+    char buf[48];
+    snprintf(buf, sizeof(buf), "screen: %d, %d", _touchX, _touchY);
+    UI::centerText(tft, buf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 32, 1, Theme::TEXT);
+    if (_touchRawX >= 0) {
+      // Same raw ADC readout as Settings > Touch Test, folded in here so a
+      // calibration check doesn't need a separate trip to Settings.
+      snprintf(buf, sizeof(buf), "raw: %d, %d", _touchRawX, _touchRawY);
+      UI::centerText(tft, buf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 16, 1, Theme::MUTED);
+    }
   }
 }
 
 void DiagnosticsApp::drawInfoPage(TFT_eSPI& tft) {
-  int16_t y = Cfg::STATUS_BAR_H + 34;
-  const int16_t lh = 20;
+  int16_t y = Cfg::STATUS_BAR_H + 30;
+  const int16_t lh = 18;
   char buf[48];
 
   tft.setTextColor(Theme::TEXT, Theme::BG);
@@ -117,7 +145,16 @@ void DiagnosticsApp::drawInfoPage(TFT_eSPI& tft) {
   snprintf(buf, sizeof(buf), "Chip: %s @ %dMHz", ESP.getChipModel(), ESP.getCpuFreqMHz());
   tft.drawString(buf, 12, y, 1); y += lh;
 
-  snprintf(buf, sizeof(buf), "Free heap: %lu KB", (unsigned long)(ESP.getFreeHeap() / 1024));
+  snprintf(buf, sizeof(buf), "Reset: %s", resetReasonName());
+  tft.drawString(buf, 12, y, 1); y += lh;
+
+  snprintf(buf, sizeof(buf), "Heap: %lu / %lu KB free (min %lu)",
+           (unsigned long)(ESP.getFreeHeap() / 1024), (unsigned long)(ESP.getHeapSize() / 1024),
+           (unsigned long)(ESP.getMinFreeHeap() / 1024));
+  tft.drawString(buf, 12, y, 1); y += lh;
+
+  snprintf(buf, sizeof(buf), "Sketch: %lu KB used, %lu KB free",
+           (unsigned long)(ESP.getSketchSize() / 1024), (unsigned long)(ESP.getFreeSketchSpace() / 1024));
   tft.drawString(buf, 12, y, 1); y += lh;
 
   snprintf(buf, sizeof(buf), "Flash: %lu MB", (unsigned long)(ESP.getFlashChipSize() / (1024UL * 1024UL)));
@@ -139,6 +176,16 @@ void DiagnosticsApp::drawInfoPage(TFT_eSPI& tft) {
     snprintf(buf, sizeof(buf), "Battery: %.2fV (%d%%)", _battery->voltage(), _battery->percent());
   } else {
     snprintf(buf, sizeof(buf), "Battery: monitor disabled");
+  }
+  tft.drawString(buf, 12, y, 1); y += lh;
+
+  // Read-only - doesn't connect WiFi itself, just reports whatever state
+  // the radio happens to be in (almost always "off", since every app that
+  // uses WiFi turns it off again on exit).
+  if (WiFi.status() == WL_CONNECTED) {
+    snprintf(buf, sizeof(buf), "WiFi: connected (%s)", WiFi.localIP().toString().c_str());
+  } else {
+    snprintf(buf, sizeof(buf), "WiFi: off");
   }
   tft.drawString(buf, 12, y, 1);
 }
@@ -181,6 +228,7 @@ void DiagnosticsApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
   if (_tab == TAB_TOUCH) {
     _touchX = x;
     _touchY = y;
+    if (_touch) _touch->readRaw(_touchRawX, _touchRawY);
     _dirty = true;
     return;
   }
