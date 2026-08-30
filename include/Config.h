@@ -34,6 +34,10 @@ constexpr bool TOUCH_SWAP_XY = true;
 constexpr bool TOUCH_INVERT_X = false;
 constexpr bool TOUCH_INVERT_Y = true;
 
+// ---- MicroSD (shares the touch controller's SPI bus - same CLK/MOSI/MISO,
+// its own CS line - standard CYD wiring; see src/core/SdCard.h) ----
+constexpr int8_t SD_CS = 5;
+
 // ---- Backlight (PWM brightness control) ----
 constexpr int8_t TFT_BL_PIN = 21;
 constexpr uint8_t BL_PWM_CHANNEL = 0;

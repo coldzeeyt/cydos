@@ -354,6 +354,7 @@
     browserLines: [], browserScroll: 0, browserLinesVisible: 0,
     homePage: 0, homeDragStartX: 0, homeDragStartY: 0, homeDragOffsetX: 0, homeIsSwipe: false, homeDragging: false,
     obsMode: 'hostEdit', obsHost: '', obsScenes: [], obsFeedbackIdx: -1, obsFeedbackOk: true, obsFeedbackUntil: 0, obsHelpReturnTo: 'hostEdit',
+    lockEnabled: false, locked: false, lastTapAt: 0,
   };
 
   const TILES = [
@@ -1251,8 +1252,17 @@
 
     button(40, 106, 116, 28, 'Set Time', { onTap: function () { S.settingsMode = 'time'; } });
     button(164, 106, 116, 28, 'WiFi Setup', { color: Theme.panel2, textColor: Theme.muted });
-    button(40, 140, W - 80, 28, 'Battery Icon: ' + (S.showBattery ? 'ON' : 'OFF'), {
+    button(40, 140, W - 80, 24, 'Battery Icon: ' + (S.showBattery ? 'ON' : 'OFF'), {
       onTap: function () { S.showBattery = !S.showBattery; },
+    });
+    button(40, 168, W - 80, 24, 'Lock Screen: ' + (S.lockEnabled ? 'ON' : 'OFF'), {
+      onTap: function () {
+        S.lockEnabled = !S.lockEnabled;
+        // On real hardware this takes effect next boot; the demo flips it
+        // immediately so you can actually try the double-tap unlock here.
+        S.locked = S.lockEnabled;
+        S.lastTapAt = 0;
+      },
     });
 
     centerText('CydOs v1.0 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
@@ -1416,9 +1426,31 @@
     morse: drawMorse, browser: drawBrowser, obs: drawObs, settings: drawSettings,
   };
 
+  const LOCK_DOUBLE_TAP_WINDOW_MS = 600;
+
+  function drawLockScreen() {
+    ctx.fillStyle = Theme.bg; ctx.fillRect(0, 0, W, H);
+    const secs = Math.floor(S.clockOffsetSec + performance.now() / 1000) % 86400;
+    const h = String(Math.floor(secs / 3600)).padStart(2, '0');
+    const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+    centerText(`${h}:${m}`, W / 2, H / 2 - 20, '700 32px "IBM Plex Mono", monospace', Theme.accent);
+    centerText('CydOs', W / 2, H / 2 + 26, '500 12px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('Double-tap to unlock', W / 2, H - 30, '500 12px "IBM Plex Mono", monospace', Theme.accent);
+    registerHit(0, 0, W, H, function () {
+      const now = performance.now();
+      if (S.lastTapAt !== 0 && now - S.lastTapAt < LOCK_DOUBLE_TAP_WINDOW_MS) {
+        S.locked = false;
+        openApp('home');
+      } else {
+        S.lastTapAt = now;
+      }
+    });
+  }
+
   function render(t) {
     resetHitboxes();
     ctx.clearRect(0, 0, W, H);
+    if (S.locked) { drawLockScreen(); requestAnimationFrame(render); return; }
     updateClock();
     updateDice(t);
     updateMorse(t);

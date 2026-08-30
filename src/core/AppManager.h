@@ -4,6 +4,7 @@
 #include "UI.h"
 #include "Battery.h"
 #include "UpdateChecker.h"
+#include "WallClock.h"
 #include "apps/App.h"
 
 // Owns the status bar (title, battery, back-to-home) and switches the
@@ -54,7 +55,28 @@ public:
   void setBatteryVisible(bool visible) { _showBattery = visible; }
   bool batteryVisible() const { return _showBattery; }
 
+  // Whether Lock Screen is turned on in Settings - persisted by the
+  // caller (Preferences), just read/stored here. Changing this takes
+  // effect on the next boot (beginLocked() is what actually locks),
+  // not mid-session, so toggling it in Settings can't lock you out of
+  // Settings itself.
+  void setLockScreenEnabled(bool on) { _lockEnabled = on; }
+  bool lockScreenEnabled() const { return _lockEnabled; }
+  bool isLocked() const { return _locked; }
+
+  // Call once from setup(), after all registerApp()/addTile() calls,
+  // instead of openApp(0), when Settings > Lock Screen is on. `clock` is
+  // optional - pass nullptr to show the lock screen without a time.
+  void beginLocked(WallClock* clock = nullptr) {
+    _lockClock = clock;
+    _locked = true;
+    _lastTapAt = 0;
+    drawLockScreen();
+  }
+
   void loop(int16_t touchX, int16_t touchY, bool touchDown, bool touchHeld) {
+    if (_locked) { loopLocked(touchDown); return; }
+
     bool needsRedraw = false;
     if (_current) needsRedraw = _current->update();
 
@@ -152,6 +174,40 @@ public:
   }
 
 private:
+  // Two taps within this window (of each other, not of any fixed clock)
+  // unlock; a lone tap just resets the window, same as a real lock screen.
+  static constexpr uint32_t DOUBLE_TAP_WINDOW_MS = 600;
+
+  void loopLocked(bool touchDown) {
+    if (touchDown) {
+      uint32_t now = millis();
+      if (_lastTapAt != 0 && now - _lastTapAt < DOUBLE_TAP_WINDOW_MS) {
+        _locked = false;
+        goHome();
+        return;
+      }
+      _lastTapAt = now;
+    }
+    uint32_t now = millis();
+    if (now - _lastBarRefresh > 1000) {
+      drawLockScreen(); // keeps the optional clock ticking while idle
+      _lastBarRefresh = now;
+    }
+  }
+
+  void drawLockScreen() {
+    TFT_eSPI& tft = *_tft;
+    tft.fillScreen(Theme::BG);
+    if (_lockClock) {
+      uint32_t s = _lockClock->secondsSinceMidnight();
+      char buf[6];
+      snprintf(buf, sizeof(buf), "%02u:%02u", (unsigned)((s / 3600) % 24), (unsigned)((s / 60) % 60));
+      UI::centerText(tft, buf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H / 2 - 20, 7, Theme::ACCENT);
+    }
+    UI::centerText(tft, "CydOs", Cfg::SCREEN_W / 2, Cfg::SCREEN_H / 2 + (_lockClock ? 26 : -6), 2, Theme::MUTED);
+    UI::centerText(tft, "Double-tap to unlock", Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 30, 2, Theme::ACCENT);
+  }
+
   TFT_eSPI* _tft = nullptr;
   Battery* _battery = nullptr;
   UpdateChecker* _updates = nullptr;
@@ -163,4 +219,9 @@ private:
   bool _showBattery = true;
   uint32_t _lastBarRefresh = 0;
   bool _lastHeld = false;
+
+  bool _lockEnabled = false;
+  bool _locked = false;
+  uint32_t _lastTapAt = 0;
+  WallClock* _lockClock = nullptr;
 };

@@ -10,6 +10,7 @@
 #include "core/AppManager.h"
 #include "core/UpdateChecker.h"
 #include "core/WallClock.h"
+#include "core/SdCard.h"
 
 #include "apps/HomeApp.h"
 #include "apps/WifiRadarApp.h"
@@ -23,6 +24,7 @@
 #include "apps/BrowserApp.h"
 #include "apps/ObsApp.h"
 #include "apps/SettingsApp.h"
+#include "apps/SdCardApp.h"
 
 TFT_eSPI tft;
 Touch touch;
@@ -44,6 +46,14 @@ MorseBeaconApp morseApp;
 BrowserApp browserApp(&prefs);
 ObsApp obsApp(&prefs);
 SettingsApp settingsApp(&appManager, &touch, &prefs, &updateChecker, &wallClock);
+
+// SD Card Apps: simple no-code screens (see src/apps/SdCardApp.h) loaded
+// from /cydos_apps/*.cydapp at boot. A fixed pool, same reasoning as the
+// community app registration - only slots that actually loaded a file get
+// a Home tile. Editing the SD card takes effect on the next power-on.
+SdCard sdCard;
+static constexpr uint8_t MAX_SD_APPS = 6;
+SdCardApp sdApps[MAX_SD_APPS];
 
 uint8_t g_lastSavedBrightness = 80;
 uint32_t g_lastBrightnessCheck = 0;
@@ -70,6 +80,7 @@ void setup() {
   appManager.begin(tft, &battery, &updateChecker);
   appManager.setBrightnessPercent(savedBrightness);
   appManager.setBatteryVisible(prefs.getBool("battshow", true));
+  appManager.setLockScreenEnabled(prefs.getBool("lockscreen", false));
 
   uint8_t homeIdx = appManager.registerApp(&homeApp);
   uint8_t wifiIdx = appManager.registerApp(&wifiApp);
@@ -103,7 +114,41 @@ void setup() {
   // overwrites it with one registerApp()+addTile() block per submitted app.
 #include "community_registration.inc"
 
-  appManager.openApp(homeIdx);
+  // SD Card Apps - scanned once here at boot. touch.begin() above already
+  // configured the shared SPI bus (see Cfg::SD_CS); if there's no card, or
+  // no /cydos_apps folder, this is a no-op and every slot stays unused.
+  if (sdCard.begin()) {
+    File dir = SD.open("/cydos_apps");
+    if (dir && dir.isDirectory()) {
+      uint8_t slot = 0;
+      File entry = dir.openNextFile();
+      while (entry && slot < MAX_SD_APPS) {
+        if (!entry.isDirectory()) {
+          String fname = entry.name();
+          String lower = fname; lower.toLowerCase();
+          if (lower.endsWith(".cydapp")) {
+            String path = fname.startsWith("/") ? fname : String("/cydos_apps/") + fname;
+            entry.close();
+            if (sdApps[slot].load(path.c_str())) {
+              uint8_t sdIdx = appManager.registerApp(&sdApps[slot]);
+              homeApp.addTile(UI::iconPuzzle, sdIdx);
+              slot++;
+            }
+            entry = dir.openNextFile();
+            continue;
+          }
+        }
+        entry.close();
+        entry = dir.openNextFile();
+      }
+    }
+  }
+
+  if (appManager.lockScreenEnabled()) {
+    appManager.beginLocked(&wallClock);
+  } else {
+    appManager.openApp(homeIdx);
+  }
 }
 
 void loop() {

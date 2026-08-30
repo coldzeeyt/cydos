@@ -50,8 +50,21 @@ same gesture the rest of the launcher uses to tell a tap from a drag.
   scene names once synced.
 - **Settings** — global brightness (persisted across reboots), a manual
   time set (Clock reads the same clock), a battery-icon show/hide toggle,
-  WiFi setup (used only for the "New Update!" check-in below), and a
-  touch test screen for calibrating the resistive touch panel.
+  a Lock Screen toggle (see below), WiFi setup (used only for the "New
+  Update!" check-in below), and a touch test screen for calibrating the
+  resistive touch panel.
+
+## Lock Screen
+
+Off by default. Turn it on in **Settings → Lock Screen** and the next
+time you power on the device, it boots straight to a lock screen (time +
+"Double-tap to unlock") instead of Home — two taps anywhere unlock it for
+the rest of that session. It doesn't re-lock when you go back to Home
+from an app; this is a "keep it off your screen at a glance" feature, not
+a security boundary — there's no PIN, and anyone can unlock it the same
+way you do. Flipping the setting takes effect on the next boot, not
+immediately, so turning it on from inside Settings can't lock you out of
+Settings itself.
 
 ## Web flasher & browser demo
 
@@ -76,21 +89,39 @@ or the web flasher will keep serving stale firmware.
 ## App Store
 
 [**coldzeeyt.github.io/cydos/store.html**](https://coldzeeyt.github.io/cydos/store.html)
-— a directory of apps other people have built for CydOs, plus a one-click
-way to actually run them. Worth being upfront about what this is: the CYD
-has no OTA or app-loading system, so nothing installs itself while it's
-running — but once a submitted app is reviewed and merged, a GitHub
-Action automatically bakes every merged app into a **Community Edition**
-firmware and republishes it, so getting one onto your device is still
-just "click Install" with the same web flasher as the main build. The
-official `CydOs.bin` above never changes because of this — Community
-Edition is a separate, opt-in, less-tested image.
+— apps and wallpapers other people made for CydOs. **The real "install"
+path requires a microSD card in your CYD** — everything below except
+Community Edition reads files straight off the card, no reflash needed.
 
-The store page also has a "Generate a submission" form: fill in your
-app's name/icon/description and upload its source, and it opens a
-pre-filled GitHub issue — no git required. It's empty until someone
-submits the first one. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the
-`App` interface and the full submission format.
+- **SD Card Apps** — simple, no-code screens. Put a plain-text
+  `name=`/`bg=`/`text=` file (see [`CONTRIBUTING.md`](CONTRIBUTING.md)
+  for the format) at `/cydos_apps/yourfile.cydapp` on a FAT32 microSD
+  card, power-cycle the CYD, and it shows up as a Home tile — up to 6 at
+  once. Editing the card takes effect on the next boot, not live.
+- **Wallpapers** — the store page has an in-browser creator: upload any
+  image, it crops to fit, and you download a `cydos_wallpaper.bmp`
+  already in the exact format CydOs reads. Drop it at
+  `/cydos_wallpaper.bmp` on the same card and it becomes Home's
+  background on next boot.
+- **Community Edition** — for real interactive apps (not static
+  screens), written in C++ against the same `App` interface the built-in
+  apps use. No SD card needed, but it's a full firmware reflash: submit
+  through the store page's "Generate a submission" form (packages your
+  code into a pre-filled GitHub issue, no git required), a maintainer
+  reviews and merges it, and CI automatically bakes every merged app into
+  a separate, opt-in **Community Edition** firmware you flash like
+  normal. The official `CydOs.bin` above never changes because of this.
+
+Everything here is empty until someone submits the first one. See
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the exact `.cydapp` field
+reference, the wallpaper file format, the `App` interface, and the full
+submission formats.
+
+**Caveat worth knowing:** the SD card support (reading the shared SPI bus
+with the touch controller, decoding BMP wallpapers) was written against
+the CYD's documented wiring but hasn't been verified on real hardware
+with a card inserted — if `.cydapp` files or a wallpaper aren't picked up,
+please open an issue with what you tried.
 
 ## OBS scene switcher
 
@@ -191,6 +222,9 @@ wires things differently.
 - [CYD board (ELEGOO 2.8" ESP32 touch display, ILI9341, USB-C)](https://www.amazon.com/dp/B0FJQ6RK39)
 - [3.7V LiPo battery, 3000mAh, JST connector](https://www.amazon.com/dp/B0FH9BLZWB) — check the
   connector matches your board (or your divider wiring) before ordering.
+- A microSD card, FAT32-formatted — optional, only needed for
+  [SD Card Apps and wallpapers](#app-store). Most CYD boards have the slot
+  built in.
 
 Neither link is sponsored — just what's in the build this was written against.
 

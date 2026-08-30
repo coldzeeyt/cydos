@@ -1,31 +1,29 @@
-# Contributing an app to CydOs
+# Contributing to CydOs
 
-CydOs has no OTA or plugin-loading system - the CYD's flash is just a
-single compiled firmware image, so nothing installs itself onto a running
-device. What actually happens when you submit an app:
+There are three ways to add something to CydOs, in order of how much
+commitment they need:
 
-1. You write a self-contained `App` subclass and submit it (see below).
-2. A maintainer reviews it and merges it as a PR that adds
-   `community-apps/<your-app>/`.
-3. A GitHub Action (`.github/workflows/community-firmware.yml`) rebuilds
-   **CydOs Community Edition** - every merged community app baked into
-   one firmware image alongside the standard apps - and republishes
-   `docs/firmware/CydOsCommunity.bin` automatically.
-4. Anyone can then flash that one file from the
-   [App Store page](https://coldzeeyt.github.io/cydos/store.html) with
-   the same one-click web installer the main site uses. That's the
-   "install" step - still a full reflash under the hood, just automated
-   so nobody has to touch PlatformIO or git to get your app.
+1. **[SD Card Apps](#sd-card-apps)** - a plain-text file on a microSD
+   card. No code, no reflash, no PR even required (you can just make one
+   for yourself) - see that section for the format. Requires the CYD to
+   have a microSD card in it.
+2. **[Community Edition apps](#community-edition-apps)** - real C++
+   against the `App` interface below, submitted via PR, automatically
+   compiled into a separate opt-in firmware anyone can flash. No SD card
+   needed, but it is a full reflash.
+3. **Built into the base firmware** - for apps general enough that
+   everyone should have them. Fork the repo, add your app under
+   `src/apps/`, register it in `src/main.cpp` directly. Expect more
+   scrutiny in review, since it changes what every device ships with -
+   most submissions should go through Community Edition instead.
 
-The official `CydOs.bin` on the main [Flash page](https://coldzeeyt.github.io/cydos/)
-is unaffected either way - it only ever contains the apps in this doc's
-main README, built and released manually like always.
-
-This doc covers writing an app and getting it into that pipeline.
+This doc covers all three, plus [wallpapers](#wallpapers) (not code at
+all, just an image).
 
 ## The `App` interface
 
-Every app implements [`src/apps/App.h`](src/apps/App.h):
+Both code paths (Community Edition and built-in) implement
+[`src/apps/App.h`](src/apps/App.h):
 
 ```cpp
 class App {
@@ -77,24 +75,31 @@ A few conventions the built-in apps all follow, worth keeping:
   `MorseBeaconApp`'s `_text[MAX_LEN + 1]`) - this is a 320KB-RAM
   microcontroller, not a phone.
 
-## Two ways to add an app
+## Built into the base firmware, or Community Edition?
 
-**Built into the base firmware** (what every app in the main README is):
-fork the repo, add your app under `src/apps/`, register it directly in
+Fork the repo, add your app under `src/apps/`, register it directly in
 `src/main.cpp`:
 ```cpp
 YourApp yourApp;
 uint8_t yourIdx = appManager.registerApp(&yourApp);
 homeApp.addTile(UI::iconYourThing, yourIdx); // add an icon fn to UI.h if you need one
 ```
-This is for apps general enough that everyone should have them - expect
-more scrutiny in review, since it changes what every device ships with.
+Do this only for apps general enough that everyone should have them -
+expect more scrutiny in review, since it changes what every device ships
+with. Everything else (anything hitting a personal API, a specific
+home-automation setup, or just not something everyone needs) goes under
+`community-apps/<slug>/` instead, and only ends up in the opt-in
+Community Edition build, never the official firmware. This is the path
+most submissions should take - see [Community Edition apps](#community-edition-apps)
+below.
 
-**A community app** (everything else - anything hitting a personal API, a
-specific home-automation setup, or just not something everyone needs):
-goes under `community-apps/<slug>/` instead, and only ends up in the
-opt-in Community Edition build, never the official firmware. This is the
-path most submissions should take. See "Getting listed" below.
+**Why compiled apps can't just live on the SD card too:** the CYD has no
+operating system, no process loader, nothing that can map and run
+arbitrary machine code at runtime the way a phone or PC loads an app -
+Arduino/ESP32-IDF firmware is one single compiled binary, full stop.
+Community Edition apps still need a real flash because of that; the SD
+card path (below) is for content that doesn't need to be compiled at
+all, not a way to sideload compiled ones.
 
 Either way, before submitting:
 
@@ -123,7 +128,7 @@ loads sample scene names instead of really fetching, since a page served
 over `https://` can't reach a plain-`http://` LAN device anyway
 (mixed-content blocking).
 
-## Getting listed in the App Store
+## Community Edition apps
 
 The easiest way is the **[Generate a submission](https://coldzeeyt.github.io/cydos/store.html)**
 form on the store page itself: fill in the name/author/icon/description,
@@ -176,6 +181,71 @@ automatically - nothing else to update by hand. There's a cap of 8
 community apps per build (`MAX_COMMUNITY_APPS` in
 `scripts/generate_community.py`); the generator fails the build loudly,
 before it reaches anyone, if that's exceeded.
+
+## SD Card Apps
+
+The lightweight, no-code path - and the only one that doesn't need a PR
+at all if you're just making one for yourself. Requires a microSD card
+(FAT32) in the CYD. Not a general programming interface - a declarative
+static screen: a name, a background color, and a few lines of text, read
+from a plain-text file by [`src/apps/SdCardApp.h`](src/apps/SdCardApp.h).
+
+Create `/cydos_apps/yourfile.cydapp` on the card:
+```
+name=WiFi Card
+bg=#101820
+text=WiFi: MyNetwork
+text=Pass: hunter2
+```
+- One `key=value` per line; blank lines and unknown keys are ignored
+  (forward-compatible with fields a future build might add).
+- `name` - shown as the tile label and the app's title bar. Defaults to
+  "SD App" if omitted.
+- `bg` - `#RRGGBB` hex background color. Defaults to the theme background.
+- `text` - up to 6 lines, each shown centered, stacked, in the order they
+  appear. With none, the screen just shows `name` centered instead.
+
+CydOs scans `/cydos_apps/*.cydapp` once at boot (up to 6 files) and adds
+a Home tile for each one it can parse - editing the card takes effect on
+the next power-cycle, not live. No submission process needed for
+personal use; if you want it listed on the store page's directory of
+example files, open a PR adding it under `community-apps/` alongside an
+`app.json` the same shape as a Community Edition one (see above) so
+others can find and copy it - the file itself still only ever runs off
+an SD card, never compiled into any firmware.
+
+**Hardware note:** the SD slot shares its SPI bus with the touch
+controller on this board (same CLK/MOSI/MISO, separate CS lines - see
+`Cfg::SD_CS` in `include/Config.h` and `src/core/SdCard.h`). This was
+written against the CYD's documented wiring but not verified against a
+real card in real hardware - if apps aren't being picked up, that
+sharing is the first thing to check.
+
+## Wallpapers
+
+Home's background image, also read from the SD card -
+[`src/core/Wallpaper.h`](src/core/Wallpaper.h) looks for
+`/cydos_wallpaper.bmp` at boot. Format: a 24-bit uncompressed BMP,
+exactly 320×214 pixels (the content area below the status bar - not the
+full 320×240 screen). Getting an arbitrary image into that exact format
+by hand is annoying, so don't - use the **Wallpaper Creator** on the
+[store page](https://coldzeeyt.github.io/cydos/store.html)'s Wallpapers
+tab: upload any image, it crops to fit client-side (a `<canvas>` and a
+~40-line BMP encoder, no upload to any server), and download the result
+already correctly formatted.
+
+To submit one to the gallery, use the store page's "Submit a wallpaper"
+form to generate the issue text (name/author/description), then attach
+the image file to that issue yourself before posting it - GitHub issues
+can't be pre-filled with an attached file, only text. A maintainer adds
+it to `docs/wallpapers/` and an entry to `docs/wallpapers.json`
+(`name`, `author`, `description`, `image` - a `wallpapers/...` relative
+path - and optionally `repo`).
+
+Same hardware caveat as SD Card Apps above - the BMP-reading logic was
+checked byte-for-byte against real BMP files during development
+(including round-tripping one through the store page's own encoder), but
+never against the actual SD card hardware.
 
 ## Everything else
 

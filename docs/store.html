@@ -168,6 +168,17 @@
   .install-panel { display: flex; flex-direction: column; gap: 12px; }
   .install-panel .row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
+  .tabbar { display: flex; gap: 8px; }
+  .tabbtn {
+    appearance: none; cursor: pointer; flex: 1;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 13px; letter-spacing: 0.04em;
+    color: var(--muted); padding: 11px 14px; text-transform: uppercase;
+  }
+  .tabbtn.active { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  #panelWallpapers[hidden], #panelApps[hidden] { display: none; }
+  #panelWallpapers, #panelApps { display: flex; flex-direction: column; gap: 22px; }
+
   footer { text-align: center; font-size: 12px; color: var(--muted); padding-top: 8px; }
   footer a { color: var(--accent); }
 </style>
@@ -189,45 +200,104 @@
   </div>
 
   <div class="hero">
-    <p class="eyebrow">Community Apps</p>
+    <p class="eyebrow">Community Content</p>
     <h1>The CydOs App Store</h1>
-    <p class="lede">A directory of apps other people built for CydOs. Being honest about how this works: the CYD has no OTA or app-loading system, so nothing here installs itself - each entry is source you pull into your own build and reflash, same as the apps that ship in the box.</p>
+    <p class="lede">Apps and wallpapers other people made for CydOs.</p>
   </div>
 
-  <div id="installBlock"></div>
+  <div class="notice" style="font-size:13.5px;"><strong>Requires a microSD card in your CYD.</strong> The App Store's actual "install" step - SD Card Apps and Wallpapers, below - reads files straight off the card, no reflash needed. If your board doesn't have a card in it, the only way to add an app is the advanced Community Edition path further down (a firmware reflash, no SD card needed).</p>
 
-  <div id="catalog"></div>
-
-  <div class="panel">
-    <h2>How "installing" an app actually works</h2>
-    <p class="lede" style="margin-bottom:16px;">Once your app is merged, it's not sitting in some marketplace waiting to be downloaded onto a running device - a GitHub Action automatically rebuilds the <strong>Community Edition</strong> firmware (every merged app baked into one image) and republishes it right here. Flashing that one file, with the same one-click installer as the main <a href="index.html" style="color: var(--accent); font-weight: 600;">Flash</a> page, is the "load it onto your CYD" step - no PlatformIO, no git, no code, on your end.</p>
-    <ol class="steps">
-      <li><span class="num">1</span><div>Implement the <code>App</code> interface (<code>onEnter</code>/<code>update</code>/<code>draw</code>/<code>onTouch</code> - see <a href="https://github.com/coldzeeyt/cydos/blob/main/src/apps/App.h" style="color: var(--accent);">App.h</a>) in one self-contained header file.</div></li>
-      <li><span class="num">2</span><div>Fill out the form below and generate a submission - it packages your app's name/author/icon/description and code into a pre-filled GitHub issue.</div></li>
-      <li><span class="num">3</span><div>Open the issue. A maintainer turns it into a pull request - this is the human review step before any code ends up in something flashed to someone else's hardware.</div></li>
-      <li><span class="num">4</span><div>Once merged, CI rebuilds <code>CydOsCommunity.bin</code> automatically and it appears in the "Install Community Edition" section above and the gallery below - usually within a couple minutes.</div></li>
-    </ol>
-    <p class="notice" style="margin-top:16px;"><strong>Prefer to do it yourself with git?</strong> See <a href="https://github.com/coldzeeyt/cydos/blob/main/CONTRIBUTING.md" style="color: var(--accent);">CONTRIBUTING.md</a> for the <code>community-apps/&lt;slug&gt;/app.json</code> format and how to open the PR directly.</p>
+  <div class="tabbar">
+    <button id="tabApps" class="tabbtn active" type="button">Apps</button>
+    <button id="tabWallpapers" class="tabbtn" type="button">Wallpapers</button>
   </div>
 
-  <div class="panel">
-    <h2>Generate a submission</h2>
-    <p class="lede" style="margin-bottom:14px;">This runs entirely in your browser - nothing is uploaded until you click "Open issue on GitHub" yourself.</p>
-    <div class="formgrid">
-      <label>App name<input id="fName" type="text" placeholder="Reversi" maxlength="40"></label>
-      <label>Your name / handle<input id="fAuthor" type="text" placeholder="jdoe" maxlength="40"></label>
-      <label>Icon (one emoji, shown on this page only)<input id="fIcon" type="text" placeholder="🔴" maxlength="8"></label>
-      <label>One-line description<input id="fDesc" type="text" placeholder="Classic Othello/Reversi against a simple AI." maxlength="140"></label>
-      <label>Link to your code (optional - a fork, gist, etc.)<input id="fRepo" type="text" placeholder="https://github.com/you/cydos-reversi"></label>
-      <label>Your app's header file (.h)<input id="fFile" type="file" accept=".h,.hpp,text/plain"></label>
-      <label id="fClassWrap" hidden>C++ class name (couldn't auto-detect it)<input id="fClass" type="text" placeholder="ReversiApp"></label>
+  <div id="panelApps">
+    <div class="panel">
+      <h2>SD Card Apps (no reflash)</h2>
+      <p class="lede" style="margin-bottom:14px;">CydOs looks for simple screens on your microSD card at <code>/cydos_apps/*.cydapp</code> every time it boots. These aren't full programs - just a name, a background color, and a few lines of text - but nothing to compile, flash, or even restart more than once.</p>
+      <ol class="steps">
+        <li><span class="num">1</span><div>Format a microSD card as FAT32 and make a <code>cydos_apps</code> folder on it.</div></li>
+        <li><span class="num">2</span><div>Create a text file in there ending in <code>.cydapp</code>, e.g. <code>wifi-card.cydapp</code>:
+          <pre style="background:var(--panel-2); border:1px solid var(--border); border-radius:6px; padding:10px; font-size:12px; margin:8px 0 0; overflow-x:auto;">name=WiFi Card
+bg=#101820
+text=WiFi: MyNetwork
+text=Pass: hunter2</pre>
+        </div></li>
+        <li><span class="num">3</span><div>Put the card in your CYD and power-cycle it. Your screen shows up as a Home tile.</div></li>
+      </ol>
+      <p class="notice" style="margin-top:16px;">Editing the card takes effect on the next boot, not live. Up to 6 <code>.cydapp</code> files at once. Full field reference in <a href="https://github.com/coldzeeyt/cydos/blob/main/CONTRIBUTING.md" style="color: var(--accent);">CONTRIBUTING.md</a>.</p>
     </div>
-    <button id="genBtn" class="genbtn" type="button">Generate submission</button>
-    <div id="genOut" hidden>
-      <p class="notice" id="genNotice" style="margin-top:16px;"></p>
-      <a id="genLink" class="install-btn-sm" target="_blank" rel="noopener" hidden>Open issue on GitHub &rarr;</a>
-      <p style="font-size:12.5px; color: var(--muted); margin: 14px 0 6px;">Or copy this and paste it into a <a href="https://github.com/coldzeeyt/cydos/issues/new" style="color: var(--accent);">new GitHub issue</a> yourself:</p>
-      <textarea id="genBody" readonly></textarea>
+
+    <div class="panel">
+      <h2>Community Edition (advanced, no SD card needed)</h2>
+      <p class="lede" style="margin-bottom:16px;">For real interactive apps (not just static screens), written in C++ against the same <code>App</code> interface the built-in apps use. These get compiled into a separate, opt-in <strong>Community Edition</strong> firmware you flash like normal - a bigger commitment than an SD card file, but works on any CYD.</p>
+      <ol class="steps">
+        <li><span class="num">1</span><div>Implement the <code>App</code> interface (<code>onEnter</code>/<code>update</code>/<code>draw</code>/<code>onTouch</code> - see <a href="https://github.com/coldzeeyt/cydos/blob/main/src/apps/App.h" style="color: var(--accent);">App.h</a>) in one self-contained header file.</div></li>
+        <li><span class="num">2</span><div>Fill out the form below and generate a submission - it packages your app's name/author/icon/description and code into a pre-filled GitHub issue.</div></li>
+        <li><span class="num">3</span><div>Open the issue. A maintainer turns it into a pull request - this is the human review step before any code ends up in something flashed to someone else's hardware.</div></li>
+        <li><span class="num">4</span><div>Once merged, CI rebuilds <code>CydOsCommunity.bin</code> automatically and it appears below, ready to install with one click.</div></li>
+      </ol>
+      <p class="notice" style="margin-top:16px;"><strong>Prefer to do it yourself with git?</strong> See <a href="https://github.com/coldzeeyt/cydos/blob/main/CONTRIBUTING.md" style="color: var(--accent);">CONTRIBUTING.md</a> for the <code>community-apps/&lt;slug&gt;/app.json</code> format and how to open the PR directly.</p>
+    </div>
+
+    <div id="installBlock"></div>
+    <div id="catalog"></div>
+
+    <div class="panel">
+      <h2>Generate a Community Edition submission</h2>
+      <p class="lede" style="margin-bottom:14px;">This runs entirely in your browser - nothing is uploaded until you click "Open issue on GitHub" yourself.</p>
+      <div class="formgrid">
+        <label>App name<input id="fName" type="text" placeholder="Reversi" maxlength="40"></label>
+        <label>Your name / handle<input id="fAuthor" type="text" placeholder="jdoe" maxlength="40"></label>
+        <label>Icon (one emoji, shown on this page only)<input id="fIcon" type="text" placeholder="🔴" maxlength="8"></label>
+        <label>One-line description<input id="fDesc" type="text" placeholder="Classic Othello/Reversi against a simple AI." maxlength="140"></label>
+        <label>Link to your code (optional - a fork, gist, etc.)<input id="fRepo" type="text" placeholder="https://github.com/you/cydos-reversi"></label>
+        <label>Your app's header file (.h)<input id="fFile" type="file" accept=".h,.hpp,text/plain"></label>
+        <label id="fClassWrap" hidden>C++ class name (couldn't auto-detect it)<input id="fClass" type="text" placeholder="ReversiApp"></label>
+      </div>
+      <button id="genBtn" class="genbtn" type="button">Generate submission</button>
+      <div id="genOut" hidden>
+        <p class="notice" id="genNotice" style="margin-top:16px;"></p>
+        <a id="genLink" class="install-btn-sm" target="_blank" rel="noopener" hidden>Open issue on GitHub &rarr;</a>
+        <p style="font-size:12.5px; color: var(--muted); margin: 14px 0 6px;">Or copy this and paste it into a <a href="https://github.com/coldzeeyt/cydos/issues/new" style="color: var(--accent);">new GitHub issue</a> yourself:</p>
+        <textarea id="genBody" readonly></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div id="panelWallpapers" hidden>
+    <div class="panel">
+      <h2>Wallpaper Creator</h2>
+      <p class="lede" style="margin-bottom:14px;">Upload any image, crop it to fit, and download a wallpaper file already in the exact format CydOs needs (320&times;214, 24-bit BMP). Put it on your microSD card as <code>/cydos_wallpaper.bmp</code> and reboot - it becomes Home's background.</p>
+      <div class="formgrid">
+        <label>Image to use<input id="wpFile" type="file" accept="image/*"></label>
+      </div>
+      <canvas id="wpCanvas" width="320" height="214" style="width:100%; max-width:480px; border-radius:8px; border:1px solid var(--border); background:var(--panel-2); display:block;"></canvas>
+      <div style="margin-top:14px; display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
+        <a id="wpDownload" class="install-btn-sm" download="cydos_wallpaper.bmp" hidden>Download cydos_wallpaper.bmp &rarr;</a>
+        <span id="wpHint" style="font-size:12.5px; color:var(--muted);">Pick an image above to preview it.</span>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Wallpaper gallery</h2>
+      <div id="wallpaperCatalog"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Submit a wallpaper</h2>
+      <p class="lede" style="margin-bottom:14px;">GitHub issues can't be pre-filled with an attached image, so this is a two-step hand-off: generate the issue text below, then drag your downloaded <code>.bmp</code> (or the original image) into the issue yourself before submitting.</p>
+      <div class="formgrid">
+        <label>Wallpaper name<input id="wName" type="text" placeholder="Sunset Gradient" maxlength="40"></label>
+        <label>Your name / handle<input id="wAuthor" type="text" placeholder="jdoe" maxlength="40"></label>
+        <label>One-line description (optional)<input id="wDesc" type="text" placeholder="A warm orange-to-purple gradient." maxlength="140"></label>
+      </div>
+      <button id="wGenBtn" class="genbtn" type="button">Generate submission text</button>
+      <div id="wGenOut" hidden>
+        <p class="notice" style="margin-top:16px;">Click below to open the issue, then <strong>attach your image file to the issue itself</strong> (drag it into GitHub's comment box) before submitting.</p>
+        <a id="wGenLink" class="install-btn-sm" target="_blank" rel="noopener">Open issue on GitHub &rarr;</a>
+      </div>
     </div>
   </div>
 
@@ -403,6 +473,168 @@
         genNotice.textContent = 'Your app is long enough that a pre-filled link would break - copy the text below into a new GitHub issue instead.';
       }
     });
+  });
+
+  // ---------- Tabs ----------
+  const tabApps = document.getElementById('tabApps');
+  const tabWallpapers = document.getElementById('tabWallpapers');
+  const panelApps = document.getElementById('panelApps');
+  const panelWallpapers = document.getElementById('panelWallpapers');
+
+  function showTab(which) {
+    const apps = which === 'apps';
+    panelApps.hidden = !apps;
+    panelWallpapers.hidden = apps;
+    tabApps.classList.toggle('active', apps);
+    tabWallpapers.classList.toggle('active', !apps);
+  }
+  tabApps.addEventListener('click', function () { showTab('apps'); });
+  tabWallpapers.addEventListener('click', function () { showTab('wallpapers'); });
+
+  // ---------- Wallpaper gallery ----------
+  const wallpaperCatalogEl = document.getElementById('wallpaperCatalog');
+
+  function renderWallpaperEmpty() {
+    wallpaperCatalogEl.innerHTML = `
+      <div class="empty">
+        <div class="big">&#127749;</div>
+        <strong>No wallpapers yet.</strong>
+        <p>Nobody's submitted one - be the first with the creator tool above.</p>
+      </div>`;
+  }
+
+  function renderWallpaperCards(items) {
+    const cards = items.map(function (w) {
+      const name = escapeHtml(w.name || 'Untitled');
+      const author = w.author ? 'by ' + escapeHtml(w.author) : '';
+      const desc = escapeHtml(w.description || '');
+      const imgOk = typeof w.image === 'string' && /^wallpapers\//.test(w.image);
+      const img = imgOk ? attrSafe(w.image) : null;
+      const repoOk = typeof w.repo === 'string' && /^https:\/\//.test(w.repo);
+      const repo = repoOk ? attrSafe(w.repo) : null;
+      return `
+        <div class="card">
+          ${img ? `<img src="${img}" alt="${name}" style="width:100%; border-radius:8px; aspect-ratio:320/214; object-fit:cover;">` : ''}
+          <h3>${name}</h3>
+          <div class="author">${author}</div>
+          <p>${desc}</p>
+          ${repo ? `<a class="repo" href="${repo}">More from this author &rarr;</a>` : ''}
+        </div>`;
+    }).join('');
+    wallpaperCatalogEl.innerHTML = `<div class="grid">${cards}</div>`;
+  }
+
+  fetch('wallpapers.json', { cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (items) {
+      if (!Array.isArray(items) || items.length === 0) renderWallpaperEmpty();
+      else renderWallpaperCards(items);
+    })
+    .catch(function () { renderWallpaperEmpty(); });
+
+  // ---------- Wallpaper creator ----------
+  const wpFile = document.getElementById('wpFile');
+  const wpCanvas = document.getElementById('wpCanvas');
+  const wpDownload = document.getElementById('wpDownload');
+  const wpHint = document.getElementById('wpHint');
+  const WP_W = 320, WP_H = 214;
+
+  function canvasToBmp24(canvas) {
+    const w = canvas.width, h = canvas.height;
+    const imgData = canvas.getContext('2d').getImageData(0, 0, w, h).data;
+    const rowBytes = (w * 3 + 3) & ~3;
+    const pixelDataSize = rowBytes * h;
+    const fileSize = 54 + pixelDataSize;
+    const buf = new ArrayBuffer(fileSize);
+    const view = new DataView(buf);
+
+    view.setUint8(0, 0x42); view.setUint8(1, 0x4D); // "BM"
+    view.setUint32(2, fileSize, true);
+    view.setUint32(6, 0, true);
+    view.setUint32(10, 54, true);
+    view.setUint32(14, 40, true);
+    view.setInt32(18, w, true);
+    view.setInt32(22, h, true); // positive height = bottom-up rows
+    view.setUint16(26, 1, true);
+    view.setUint16(28, 24, true);
+    view.setUint32(30, 0, true);
+    view.setUint32(34, pixelDataSize, true);
+    view.setInt32(38, 2835, true);
+    view.setInt32(42, 2835, true);
+    view.setUint32(46, 0, true);
+    view.setUint32(50, 0, true);
+
+    const bytes = new Uint8Array(buf);
+    let offset = 54;
+    const pad = rowBytes - w * 3;
+    for (let y = h - 1; y >= 0; y--) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        bytes[offset++] = imgData[i + 2];
+        bytes[offset++] = imgData[i + 1];
+        bytes[offset++] = imgData[i];
+      }
+      for (let p = 0; p < pad; p++) bytes[offset++] = 0;
+    }
+    return bytes;
+  }
+
+  wpFile.addEventListener('change', function () {
+    const file = wpFile.files[0];
+    if (!file) return;
+    const img = new Image();
+    img.onload = function () {
+      const ctx2 = wpCanvas.getContext('2d');
+      // Cover-fit: scale to fill 320x214 and crop the overflow, centered,
+      // so any source image/aspect ratio works with no manual cropping.
+      const scale = Math.max(WP_W / img.width, WP_H / img.height);
+      const sw = WP_W / scale, sh = WP_H / scale;
+      const sx = (img.width - sw) / 2, sy = (img.height - sh) / 2;
+      ctx2.clearRect(0, 0, WP_W, WP_H);
+      ctx2.drawImage(img, sx, sy, sw, sh, 0, 0, WP_W, WP_H);
+      URL.revokeObjectURL(img.src);
+
+      const bmp = canvasToBmp24(wpCanvas);
+      const blob = new Blob([bmp], { type: 'image/bmp' });
+      wpDownload.href = URL.createObjectURL(blob);
+      wpDownload.hidden = false;
+      wpHint.textContent = 'Cropped to 320×214. Download it, then copy it to /cydos_wallpaper.bmp on your SD card.';
+    };
+    img.onerror = function () { wpHint.textContent = "Couldn't load that as an image - try a different file."; };
+    img.src = URL.createObjectURL(file);
+  });
+
+  // ---------- Wallpaper submission ----------
+  document.getElementById('wGenBtn').addEventListener('click', function () {
+    const name = document.getElementById('wName').value.trim();
+    const author = document.getElementById('wAuthor').value.trim();
+    const desc = document.getElementById('wDesc').value.trim();
+    const wGenOut = document.getElementById('wGenOut');
+    const wGenLink = document.getElementById('wGenLink');
+
+    if (!name || !author) {
+      wGenOut.hidden = false;
+      wGenLink.removeAttribute('href');
+      return;
+    }
+
+    const body = [
+      '**New CydOs wallpaper submission**',
+      '',
+      '- Name: ' + name,
+      '- Author: ' + author,
+      '- Description: ' + (desc || '(none)'),
+      '',
+      '**Attach your wallpaper image to this issue before submitting** (drag it into this box) - a pre-filled link can\'t carry an image file.',
+    ].join('\n');
+
+    const url = 'https://github.com/coldzeeyt/cydos/issues/new?title=' +
+      encodeURIComponent('Wallpaper submission: ' + name) +
+      '&labels=' + encodeURIComponent('wallpaper-submission') +
+      '&body=' + encodeURIComponent(body);
+
+    wGenLink.href = url;
+    wGenOut.hidden = false;
   });
 </script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/esp-web-tools@10/dist/web/install-button.js"></script>

@@ -32,6 +32,9 @@ void SettingsApp::drawMain(TFT_eSPI& tft) {
   _battToggleBtn.label = _mgr->batteryVisible() ? "Battery Icon: ON" : "Battery Icon: OFF";
   _battToggleBtn.draw(tft);
 
+  _lockToggleBtn.label = _mgr->lockScreenEnabled() ? "Lock Screen: ON" : "Lock Screen: OFF";
+  _lockToggleBtn.draw(tft);
+
   char verBuf[24];
   snprintf(verBuf, sizeof(verBuf), "CydOs v%s", CYDOS_VERSION);
   UI::centerText(tft, verBuf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 10, 1, Theme::MUTED);
@@ -284,6 +287,16 @@ void SettingsApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
     bool visible = !_mgr->batteryVisible();
     _mgr->setBatteryVisible(visible);
     _prefs->putBool("battshow", visible);
+    _dirty = true;
+    return;
+  }
+  if (down && _lockToggleBtn.hit(x, y)) {
+    // Takes effect on the next boot (beginLocked() in main.cpp reads this
+    // pref at startup) - flipping it here can't lock you out of Settings
+    // mid-session.
+    bool enabled = !_mgr->lockScreenEnabled();
+    _mgr->setLockScreenEnabled(enabled);
+    _prefs->putBool("lockscreen", enabled);
     _dirty = true;
     return;
   }

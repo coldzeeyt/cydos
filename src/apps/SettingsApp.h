@@ -40,7 +40,8 @@ private:
   UI::Button _touchTestBtn{{40, 106, 116, 28}, "Touch Test"};
   UI::Button _setTimeBtn{{164, 106, 116, 28}, "Set Time"};
   UI::Button _wifiBtn{{40, 140, Cfg::SCREEN_W - 80, 28}, "WiFi Setup"};
-  UI::Button _battToggleBtn{{40, 174, Cfg::SCREEN_W - 80, 28}, "Battery Icon: ON"};
+  UI::Button _battToggleBtn{{40, 174, Cfg::SCREEN_W - 80, 24}, "Battery Icon: ON"};
+  UI::Button _lockToggleBtn{{40, 202, Cfg::SCREEN_W - 80, 24}, "Lock Screen: OFF"};
   UI::Button _backBtn{{10, Cfg::STATUS_BAR_H + 6, 90, 30}, "<- Back"};
   UI::Button _timeHourUp{{40, Cfg::STATUS_BAR_H + 90, 40, 34}, "H+"};
   UI::Button _timeHourDn{{90, Cfg::STATUS_BAR_H + 90, 40, 34}, "H-"};

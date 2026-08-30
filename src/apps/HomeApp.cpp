@@ -1,5 +1,6 @@
 #include "HomeApp.h"
 #include "core/AppManager.h"
+#include "core/Wallpaper.h"
 #include "Config.h"
 
 UI::Rect HomeApp::tileRectInPage(uint8_t i) const {
@@ -57,7 +58,7 @@ int8_t HomeApp::tileAt(uint8_t page, int16_t x, int16_t y) const {
 void HomeApp::draw(TFT_eSPI& tft) {
   if (!_dirty) return;
   _dirty = false;
-  UI::clearContent(tft);
+  if (!Wallpaper::draw(tft)) UI::clearContent(tft);
   drawPage(tft, _page, _dragOffsetX);
 
   uint8_t pages = pageCount();
