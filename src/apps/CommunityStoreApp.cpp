@@ -31,8 +31,12 @@ UI::Rect CommunityStoreApp::tabRect(uint8_t i) const {
   return {(int16_t)(Cfg::SCREEN_W / 2 + 1), y, w, h};
 }
 
-UI::Rect CommunityStoreApp::browseRowRect(uint8_t i) const {
-  return {4, (int16_t)(Cfg::STATUS_BAR_H + 28 + i * 26), (int16_t)(Cfg::SCREEN_W - 8), 24};
+UI::Rect CommunityStoreApp::browseRowRect(uint8_t rowInPage) const {
+  return {4, (int16_t)(Cfg::STATUS_BAR_H + 28 + rowInPage * 26), (int16_t)(Cfg::SCREEN_W - 8), 24};
+}
+
+uint8_t CommunityStoreApp::browsePageCount() const {
+  return _itemCount == 0 ? 0 : (_itemCount + BROWSE_ROWS_PER_PAGE - 1) / BROWSE_ROWS_PER_PAGE;
 }
 
 void CommunityStoreApp::onEnter(TFT_eSPI& tft) {
@@ -94,6 +98,7 @@ void CommunityStoreApp::loadBrowseCatalog(TFT_eSPI& tft) {
   uint8_t appCount = addItems("/ondevice_apps.txt", true, "/cydos_apps");
   uint8_t wpCount = addItems("/ondevice_wallpapers.txt", false, "/cydos_wallpapers");
 
+  _browsePage = 0;
   _browseState = (appCount == 0 && wpCount == 0) ? FAILED : LOADED;
 }
 
@@ -173,9 +178,11 @@ void CommunityStoreApp::drawBrowse(TFT_eSPI& tft) {
     return;
   }
 
-  for (uint8_t i = 0; i < _itemCount; i++) {
-    UI::Rect r = browseRowRect(i);
-    if (r.y > Cfg::SCREEN_H - 20) break; // small catalog for now - no pagination yet
+  uint8_t base = _browsePage * BROWSE_ROWS_PER_PAGE;
+  for (uint8_t row = 0; row < BROWSE_ROWS_PER_PAGE; row++) {
+    uint8_t i = base + row;
+    if (i >= _itemCount) break;
+    UI::Rect r = browseRowRect(row);
     tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, Theme::PANEL);
     tft.setTextColor(Theme::TEXT, Theme::PANEL);
     tft.setTextDatum(ML_DATUM);
@@ -191,6 +198,17 @@ void CommunityStoreApp::drawBrowse(TFT_eSPI& tft) {
     tft.setTextDatum(MC_DATUM);
     tft.drawString(_items[i].installed ? "Done" : "Get", btn.x + btn.w / 2, btn.y + btn.h / 2 + 1, 1);
     tft.setTextDatum(TL_DATUM);
+  }
+
+  uint8_t pc = browsePageCount();
+  if (pc > 1) {
+    _browsePrevBtn.textColor = _browsePage > 0 ? Theme::TEXT : Theme::MUTED;
+    _browseNextBtn.textColor = (_browsePage + 1 < pc) ? Theme::TEXT : Theme::MUTED;
+    _browsePrevBtn.draw(tft);
+    _browseNextBtn.draw(tft);
+    char pageBuf[12];
+    snprintf(pageBuf, sizeof(pageBuf), "%d/%d", _browsePage + 1, pc);
+    UI::centerText(tft, pageBuf, Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 195, 1, Theme::MUTED);
   }
 }
 
@@ -226,9 +244,24 @@ void CommunityStoreApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) 
 
   // BROWSE
   if (_browseState != LOADED) return;
-  for (uint8_t i = 0; i < _itemCount; i++) {
-    UI::Rect r = browseRowRect(i);
-    if (r.y > Cfg::SCREEN_H - 20) break;
+
+  uint8_t pc = browsePageCount();
+  if (pc > 1) {
+    if (_browsePrevBtn.hit(x, y)) {
+      if (_browsePage > 0) { _browsePage--; _dirty = true; }
+      return;
+    }
+    if (_browseNextBtn.hit(x, y)) {
+      if (_browsePage + 1 < pc) { _browsePage++; _dirty = true; }
+      return;
+    }
+  }
+
+  uint8_t base = _browsePage * BROWSE_ROWS_PER_PAGE;
+  for (uint8_t row = 0; row < BROWSE_ROWS_PER_PAGE; row++) {
+    uint8_t i = base + row;
+    if (i >= _itemCount) break;
+    UI::Rect r = browseRowRect(row);
     UI::Rect btn{(int16_t)(r.x + r.w - 66), r.y, 62, r.h};
     if (btn.contains(x, y) && !_items[i].installed) {
       downloadItem(tft, i);

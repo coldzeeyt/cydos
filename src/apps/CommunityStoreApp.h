@@ -62,7 +62,11 @@ private:
   BrowseState _browseState = NOT_LOADED;
   bool _dirty = true;
 
-  static constexpr uint8_t MAX_BROWSE_ITEMS = 12;
+  // Was 12 - too easy to blow through once apps and wallpapers add up
+  // (they share this one cap), silently dropping later submissions from
+  // Get More with no sign anything was cut. 60 costs under 5KB of RAM
+  // (trivial against 327KB total) and leaves real headroom to grow.
+  static constexpr uint8_t MAX_BROWSE_ITEMS = 60;
   static constexpr uint8_t NAME_LEN = 32;
   static constexpr uint8_t PATH_LEN = 48;
   struct BrowseItem {
@@ -74,10 +78,20 @@ private:
   BrowseItem _items[MAX_BROWSE_ITEMS];
   uint8_t _itemCount = 0;
 
+  // The rows themselves only ever fit ~7 on screen at once - paginated
+  // the same way Files browses SD card directories (see
+  // FileManagerApp::ROWS_PER_PAGE) instead of just silently dropping
+  // whatever didn't fit below the fold.
+  static constexpr uint8_t BROWSE_ROWS_PER_PAGE = 6;
+  uint8_t _browsePage = 0;
+  UI::Button _browsePrevBtn{{40, Cfg::STATUS_BAR_H + 184, 60, 22}, "<"};
+  UI::Button _browseNextBtn{{(int16_t)(Cfg::SCREEN_W - 100), Cfg::STATUS_BAR_H + 184, 60, 22}, ">"};
+
   UI::Rect tileRect(uint8_t i) const;
   int8_t tileAt(int16_t x, int16_t y) const;
   UI::Rect tabRect(uint8_t i) const;
-  UI::Rect browseRowRect(uint8_t i) const;
+  UI::Rect browseRowRect(uint8_t rowInPage) const;
+  uint8_t browsePageCount() const;
 
   bool connectWifi();
   void loadBrowseCatalog(TFT_eSPI& tft);

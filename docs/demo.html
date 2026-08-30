@@ -411,7 +411,7 @@
     filesPath: '/', filesPage: 0, filesSelected: -1, filesMode: 'browse', filesStatus: '', filesStatusUntil: 0,
     diagTab: 'display', diagPattern: 0, diagTouchX: -1, diagTouchY: -1,
     devMode: false, activeWallpaper: 'default', wpPreviewId: null,
-    storeMode: 'installed', storeBrowseState: 'notLoaded', storeItems: [], downloadedSdApps: [], downloadedWallpapers: [],
+    storeMode: 'installed', storeBrowseState: 'notLoaded', storeItems: [], storePage: 0, downloadedSdApps: [], downloadedWallpapers: [],
     wifiSsid: '', wifiPass: '', settingsWifiField: 'ssid',
     wifiBusy: false, wifiBusyUntil: 0, wifiBusyNext: null,
     obsSyncError: false, spotifySyncError: false, storeDownloadError: null,
@@ -537,12 +537,20 @@
   // decoded from the SD card, which a browser tab has no access to, so
   // these are drawn as flat gradients instead, purely to show the
   // Settings > Wallpapers picker actually doing something to Home.
+  // "Solar Flare" and "Deep Space" used to live here as fake gradient
+  // placeholders, from before real wallpaper files existed in the repo.
+  // Now that they're real, downloadable images (see docs/wallpapers.json),
+  // keeping both meant two entries sharing the same id/name - and since
+  // findWallpaper() checks this array first, the real downloaded photo
+  // could never actually be shown; picking either one always rendered the
+  // old placeholder gradient instead. The real firmware has never had
+  // named presets at all (Settings > Wallpapers just lists files on the
+  // SD card), so removing them here brings the demo in line with that
+  // instead of re-numbering around the collision.
   const WALLPAPERS = [
     { id: 'default', name: 'Default' },
     { id: 'aurora', name: 'Aurora', from: '#0b1f3a', to: '#00d9f0' },
     { id: 'ember', name: 'Ember', from: '#2a0e0e', to: '#ffb020' },
-    { id: 'solar-flare', name: 'Solar Flare', from: '#1a0a06', to: '#ff8c28' },
-    { id: 'deep-space', name: 'Deep Space', from: '#140a2a', to: '#28c8b4' },
   ];
 
   // Preset entries are flat gradients (no real image to show). A
@@ -1710,7 +1718,13 @@
     centerText('Try Get More, or flash a Community Edition build', W / 2, H / 2 + 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
   }
 
-  function storeRowRect(i) { return { x: 4, y: STATUS_H + 28 + i * 26, w: W - 8, h: 24 }; }
+  function storeRowRect(rowInPage) { return { x: 4, y: STATUS_H + 28 + rowInPage * 26, w: W - 8, h: 24 }; }
+
+  // Paginated the same way Files (see FILES_ROWS_PER_PAGE) browses SD
+  // card directories, instead of silently dropping whatever didn't fit
+  // below the fold - mirrors CommunityStoreApp::BROWSE_ROWS_PER_PAGE.
+  const STORE_ROWS_PER_PAGE = 6;
+  function storePageCount() { return S.storeItems.length === 0 ? 0 : Math.ceil(S.storeItems.length / STORE_ROWS_PER_PAGE); }
 
   function loadStoreBrowse() {
     S.storeBrowseState = 'loading';
@@ -1725,6 +1739,7 @@
         });
       }
       S.storeItems = parse(results[0], true).concat(parse(results[1], false));
+      S.storePage = 0;
       S.storeBrowseState = S.storeItems.length ? 'loaded' : 'failed';
     }).catch(function () { S.storeBrowseState = 'failed'; });
   }
@@ -1799,9 +1814,12 @@
       centerText('(Get More only works on the deployed site)', W / 2, H / 2 + 10, '500 9px "IBM Plex Mono", monospace', Theme.muted);
       return;
     }
-    S.storeItems.forEach(function (item, i) {
-      const r = storeRowRect(i);
-      if (r.y > H - 20) return;
+    const base = S.storePage * STORE_ROWS_PER_PAGE;
+    for (let row = 0; row < STORE_ROWS_PER_PAGE; row++) {
+      const i = base + row;
+      if (i >= S.storeItems.length) break;
+      const item = S.storeItems[i];
+      const r = storeRowRect(row);
       roundRect(r.x, r.y, r.w, r.h, 4); ctx.fillStyle = Theme.panel; ctx.fill();
       ctx.fillStyle = Theme.text; ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
       ctx.fillText((item.isApp ? '[App] ' : '[Wall] ') + item.name, r.x + 8, r.y + r.h / 2 + 1);
@@ -1814,7 +1832,21 @@
       ctx.fillText(item.installed ? 'Done' : 'Get', btn.x + btn.w / 2, btn.y + btn.h / 2 + 1);
       ctx.textAlign = 'left';
       if (!item.installed) registerHit(btn.x, btn.y, btn.w, btn.h, function () { downloadStoreItem(i); });
-    });
+    }
+
+    const pc = storePageCount();
+    if (pc > 1) {
+      const prevActive = S.storePage > 0, nextActive = S.storePage + 1 < pc;
+      button(40, STATUS_H + 184, 60, 22, '<', {
+        textColor: prevActive ? Theme.text : Theme.muted,
+        onTap: function () { if (S.storePage > 0) S.storePage--; },
+      });
+      button(W - 100, STATUS_H + 184, 60, 22, '>', {
+        textColor: nextActive ? Theme.text : Theme.muted,
+        onTap: function () { if (S.storePage + 1 < storePageCount()) S.storePage++; },
+      });
+      centerText((S.storePage + 1) + '/' + pc, W / 2, STATUS_H + 196, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    }
 
     if (S.storeDownloadError) {
       centerText('Download failed: ' + S.storeDownloadError, W / 2, H - 12, '500 9px "IBM Plex Mono", monospace', Theme.danger);
