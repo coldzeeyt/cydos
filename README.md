@@ -177,6 +177,23 @@ the CYD's documented wiring but hasn't been verified on real hardware
 with a card inserted — if `.cydapp` files or a wallpaper aren't picked up,
 please open an issue with what you tried.
 
+## Q&A
+
+[**coldzeeyt.github.io/cydos/qna.html**](https://coldzeeyt.github.io/cydos/qna.html)
+— ask a question about CydOs. Like the App Store's submission forms, it's
+a plain GitHub issue under the hood: asking opens a pre-filled issue
+labeled `question` (no git required), and the page lists every open one
+live via the GitHub API so an answer stays visible for the next person
+with the same question.
+
+Two things can answer a question: the repo owner, by commenting on the
+issue directly, or a Claude Code bot that checks every couple of hours
+for `question` issues nobody's answered yet and answers them itself —
+strictly only if the owner hasn't gotten to it first, so it never talks
+over them. A bot answer is labeled **Answered by ClaudeBot** on the page;
+an owner answer just shows as **Answered**. Either way, the answer shows
+up on the page itself, not just in the issue.
+
 ## OBS scene switcher
 
 The OBS app talks directly to a small Python script that runs inside OBS
@@ -378,6 +395,7 @@ src/main.cpp             boot + app registration
 src/core/                display/touch/battery drivers, UI toolkit, app manager
 src/apps/                one file (or header+cpp) per app
 docs/                    GitHub Pages site: web flasher (index.html), browser demo (demo.html),
+                         App Store (store.html), Q&A (qna.html),
                          version.json (the "New Update!" trigger - see above)
 obs-script/              cydos_scene_switcher.py - the OBS-side companion script (see above)
 ```
