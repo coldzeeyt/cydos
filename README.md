@@ -72,7 +72,28 @@ or the web flasher will keep serving stale firmware.
 
 The OBS app talks directly to a small Python script that runs inside OBS
 itself — no separate program to install or keep running, and no compiled
-plugin to build:
+plugin to build. The **OBS** app also has its own **?** help button (on
+both the host-entry screen and the scene grid) with this same walkthrough
+for Windows, in case you're setting it up away from a computer.
+
+**Things you need first (Windows):**
+
+- **Python, and OBS pointed at it.** OBS's scripting console doesn't
+  bundle its own Python — if `Tools → Scripts` shows a red warning at the
+  bottom instead of letting you add a script, you need this step.
+  1. Install [Python 3.9 or 3.10 for Windows](https://www.python.org/downloads/windows/)
+     (OBS's bundled script engine doesn't support newer 3.11+ yet on every
+     OBS version — 3.9/3.10 is the safe choice).
+  2. In OBS: **Tools → Scripts → Python Settings** tab, and browse to the
+     folder where Python installed (e.g.
+     `C:\Users\<you>\AppData\Local\Programs\Python\Python310`).
+- **Your PC's LAN IP**, so the CYD knows where to send requests:
+  1. Open **Command Prompt** (Win+R, type `cmd`, Enter).
+  2. Run `ipconfig`.
+  3. Under your active **Wi-Fi** or **Ethernet adapter**, read the
+     **IPv4 Address** line (e.g. `192.168.1.50`).
+
+**Setup:**
 
 1. In OBS: **Tools → Scripts → +** and add
    [`obs-script/cydos_scene_switcher.py`](obs-script/cydos_scene_switcher.py).
@@ -82,12 +103,14 @@ plugin to build:
    - `GET /scenes` → JSON array of your scene names.
    - `GET /switch?scene=Name` → switches to that scene (or pass a 1-based
      number instead of a name).
-4. On the CYD, open the **OBS** app, tap **Edit**, and type your PC's LAN
-   IP and port (e.g. `192.168.1.50:8088`) on the on-screen keyboard, then
-   **Done**. Tap **Sync** to pull your real scene names into the grid.
+4. On the CYD, open the **OBS** app, tap **Edit**, and type your PC's IP
+   and the port from step 2 (e.g. `192.168.1.50:8088`) on the on-screen
+   keyboard, then **Done**. Tap **Sync** to pull your real scene names
+   into the grid.
 5. Tap any tile to switch OBS to that scene — a green border confirms it
-   worked, red means the request failed (wrong host, OBS closed, script
-   not running, etc).
+   worked, red means the request failed (wrong host/port, OBS closed,
+   script not running, a Windows Firewall prompt you haven't answered
+   yet, etc).
 
 No authentication, so only run it on a network you trust — it's meant for
 your own LAN, don't port-forward the port. The CYD only talks to it while

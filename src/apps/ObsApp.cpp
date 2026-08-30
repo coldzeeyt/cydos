@@ -192,10 +192,13 @@ void ObsApp::drawGrid(TFT_eSPI& tft) {
 
   tft.setTextColor(_hostLen ? Theme::MUTED : Theme::DANGER, Theme::BG);
   tft.setTextDatum(ML_DATUM);
-  tft.drawString(_hostLen ? _host : "no companion host set", 8, Cfg::STATUS_BAR_H + 13, 1);
+  // Truncate so a long host:port never runs under the Sync/Edit/Help buttons.
+  const char* shown = (_hostLen > 28) ? _host + (_hostLen - 28) : _host;
+  tft.drawString(_hostLen ? shown : "no companion host set", 8, Cfg::STATUS_BAR_H + 13, 1);
   tft.setTextDatum(TL_DATUM);
   _refreshBtn.draw(tft);
   _editBtn.draw(tft);
+  _helpBtn.draw(tft);
 
   for (uint8_t i = 0; i < NUM_SCENES; i++) {
     UI::Rect cell = sceneRect(i);
@@ -226,12 +229,14 @@ void ObsApp::drawGrid(TFT_eSPI& tft) {
 void ObsApp::drawHostEdit(TFT_eSPI& tft) {
   UI::clearContent(tft);
 
-  tft.fillRoundRect(4, Cfg::STATUS_BAR_H + 2, Cfg::SCREEN_W - 8, 24, 4, Theme::PANEL);
+  int16_t fieldW = Cfg::SCREEN_W - 8 - 32; // leave room for the "?" help button
+  tft.fillRoundRect(4, Cfg::STATUS_BAR_H + 2, fieldW, 24, 4, Theme::PANEL);
   tft.setTextColor(_hostLen ? Theme::TEXT : Theme::MUTED, Theme::PANEL);
   tft.setTextDatum(ML_DATUM);
-  const char* shown = _hostLen > 34 ? _host + (_hostLen - 34) : _host;
+  const char* shown = _hostLen > 26 ? _host + (_hostLen - 26) : _host;
   tft.drawString(_hostLen ? shown : "host:port, e.g. 192.168.1.50:8088", 10, Cfg::STATUS_BAR_H + 14, 2);
   tft.setTextDatum(TL_DATUM);
+  _helpBtn.draw(tft);
 
   for (uint8_t r = 0; r < KB_ROWS; r++) {
     uint8_t len = strlen(_kbRows[r]);
@@ -255,6 +260,35 @@ void ObsApp::drawHostEdit(TFT_eSPI& tft) {
   _kbDoneBtn.draw(tft);
 }
 
+void ObsApp::drawHelp(TFT_eSPI& tft) {
+  UI::clearContent(tft);
+
+  UI::centerText(tft, "OBS Setup (Windows)", Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 12, 2, Theme::ACCENT);
+
+  static const char* LINES[] = {
+      "1. OBS: Tools>Scripts>+, add",
+      "   cydos_scene_switcher.py",
+      "2. First time: Tools>Scripts>",
+      "   Python Settings - point it",
+      "   at your Python install",
+      "   (get 3.9 or 3.10 if needed).",
+      "3. Get this PC's IP: open cmd,",
+      "   run ipconfig, read the",
+      "   'IPv4 Address' line.",
+      "4. Enter IP:port above, e.g.",
+      "   192.168.1.50:8088",
+  };
+  int16_t y = Cfg::STATUS_BAR_H + 26;
+  tft.setTextColor(Theme::TEXT, Theme::BG);
+  tft.setTextDatum(TL_DATUM);
+  for (const char* line : LINES) {
+    tft.drawString(line, 8, y, 1);
+    y += 13;
+  }
+
+  _helpBackBtn.draw(tft);
+}
+
 void ObsApp::draw(TFT_eSPI& tft) {
   if (!_dirty) return;
   _dirty = false;
@@ -263,6 +297,7 @@ void ObsApp::draw(TFT_eSPI& tft) {
     case FAILED: drawFailed(tft); break;
     case GRID: drawGrid(tft); break;
     case HOST_EDIT: drawHostEdit(tft); break;
+    case HELP: drawHelp(tft); break;
   }
 }
 
@@ -274,7 +309,13 @@ void ObsApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
     return;
   }
 
+  if (_mode == HELP) {
+    if (_helpBackBtn.hit(x, y)) { _mode = _helpReturnTo; _dirty = true; }
+    return;
+  }
+
   if (_mode == HOST_EDIT) {
+    if (_helpBtn.hit(x, y)) { _helpReturnTo = HOST_EDIT; _mode = HELP; _dirty = true; return; }
     for (uint8_t r = 0; r < KB_ROWS; r++) {
       uint8_t len = strlen(_kbRows[r]);
       for (uint8_t c = 0; c < len; c++) {
@@ -300,6 +341,7 @@ void ObsApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
   // GRID
   if (_editBtn.hit(x, y)) { _mode = HOST_EDIT; _dirty = true; return; }
   if (_refreshBtn.hit(x, y)) { fetchScenes(); _dirty = true; return; }
+  if (_helpBtn.hit(x, y)) { _helpReturnTo = GRID; _mode = HELP; _dirty = true; return; }
   for (uint8_t i = 0; i < NUM_SCENES; i++) {
     if (sceneRect(i).contains(x, y)) { sendScene(tft, i); return; }
   }

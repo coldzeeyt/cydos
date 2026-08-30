@@ -113,9 +113,12 @@ void loop() {
 
   // Don't let a periodic update check steal the WiFi radio out from under
   // an active scan in WiFi Radar, or collide with Browser's or OBS's own
-  // WiFi/HTTP use.
+  // WiFi/HTTP use. Also skip it in Morse: performCheck() blocks the whole
+  // loop for several seconds (WiFi connect + HTTPS GET), which would freeze
+  // appManager.loop() mid-flash and scramble the on/off timing a Morse
+  // signal depends on.
   if (appManager.currentApp() != &wifiApp && appManager.currentApp() != &browserApp &&
-      appManager.currentApp() != &obsApp) {
+      appManager.currentApp() != &obsApp && appManager.currentApp() != &morseApp) {
     updateChecker.update();
   }
 

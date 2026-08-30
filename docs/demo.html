@@ -351,7 +351,7 @@
     browserMode: 'url', browserUrl: 'example.com', browserLoading: false,
     browserLines: [], browserScroll: 0, browserLinesVisible: 0,
     homePage: 0, homeDragStartX: 0, homeDragStartY: 0, homeDragOffsetX: 0, homeIsSwipe: false, homeDragging: false,
-    obsMode: 'hostEdit', obsHost: '', obsScenes: [], obsFeedbackIdx: -1, obsFeedbackOk: true, obsFeedbackUntil: 0,
+    obsMode: 'hostEdit', obsHost: '', obsScenes: [], obsFeedbackIdx: -1, obsFeedbackOk: true, obsFeedbackUntil: 0, obsHelpReturnTo: 'hostEdit',
   };
 
   const TILES = [
@@ -1043,8 +1043,9 @@
     ctx.fillStyle = S.obsHost ? Theme.muted : Theme.danger;
     ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
     ctx.fillText(S.obsHost || 'no companion host set', 8, STATUS_H + 13);
-    button(W - 118, STATUS_H + 2, 52, 22, 'Sync', { onTap: function () { S.obsScenes = OBS_DEMO_SCENES.slice(); } });
-    button(W - 62, STATUS_H + 2, 56, 22, 'Edit', { onTap: function () { S.obsMode = 'hostEdit'; } });
+    button(W - 128, STATUS_H + 2, 44, 22, 'Sync', { onTap: function () { S.obsScenes = OBS_DEMO_SCENES.slice(); } });
+    button(W - 80, STATUS_H + 2, 44, 22, 'Edit', { onTap: function () { S.obsMode = 'hostEdit'; } });
+    button(W - 32, STATUS_H + 2, 28, 22, '?', { onTap: function () { S.obsHelpReturnTo = 'grid'; S.obsMode = 'help'; } });
 
     for (let i = 0; i < OBS_NUM_SCENES; i++) {
       const cell = obsSceneRect(i);
@@ -1068,11 +1069,13 @@
 
   function drawObsHostEdit() {
     clearContent();
-    roundRect(4, STATUS_H + 2, W - 8, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    const fieldW = W - 8 - 32;
+    roundRect(4, STATUS_H + 2, fieldW, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
     ctx.fillStyle = S.obsHost ? Theme.text : Theme.muted;
     ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
-    const shown = S.obsHost.length > 34 ? S.obsHost.slice(-34) : S.obsHost;
+    const shown = S.obsHost.length > 26 ? S.obsHost.slice(-26) : S.obsHost;
     ctx.fillText(S.obsHost ? shown : 'host:port, e.g. 192.168.1.50:8088', 10, STATUS_H + 15);
+    button(W - 32, STATUS_H + 2, 28, 22, '?', { onTap: function () { S.obsHelpReturnTo = 'hostEdit'; S.obsMode = 'help'; } });
 
     const top = STATUS_H + 30, rowH = 24;
     OBS_KB_ROWS.forEach(function (row, r) {
@@ -1092,7 +1095,35 @@
     button(202, ctrlY, 114, 26, 'Done', { onTap: function () { S.obsMode = 'grid'; } });
   }
 
-  function drawObs() { S.obsMode === 'hostEdit' ? drawObsHostEdit() : drawObsGrid(); }
+  const OBS_HELP_LINES = [
+    '1. OBS: Tools>Scripts>+, add',
+    '   cydos_scene_switcher.py',
+    '2. First time: Tools>Scripts>',
+    '   Python Settings - point it',
+    '   at your Python install',
+    '   (get 3.9 or 3.10 if needed).',
+    "3. Get this PC's IP: open cmd,",
+    '   run ipconfig, read the',
+    "   'IPv4 Address' line.",
+    '4. Enter IP:port above, e.g.',
+    '   192.168.1.50:8088',
+  ];
+
+  function drawObsHelp() {
+    clearContent();
+    centerText('OBS Setup (Windows)', W / 2, STATUS_H + 12, '600 12px "IBM Plex Mono", monospace', Theme.accent);
+    ctx.fillStyle = Theme.text;
+    ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    let y = STATUS_H + 26;
+    for (const line of OBS_HELP_LINES) { ctx.fillText(line, 8, y); y += 13; }
+    button(4, H - 36, 90, 30, 'Back', { onTap: function () { S.obsMode = S.obsHelpReturnTo; } });
+  }
+
+  function drawObs() {
+    if (S.obsMode === 'help') drawObsHelp();
+    else if (S.obsMode === 'hostEdit') drawObsHostEdit();
+    else drawObsGrid();
+  }
 
   // ---------- Settings ----------
   function drawSettingsMain() {
@@ -1107,7 +1138,7 @@
       onTap: function () { S.showBattery = !S.showBattery; },
     });
 
-    centerText('CydOs v1.6 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('CydOs v1.7 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
   }
 
   function drawSettingsTime() {

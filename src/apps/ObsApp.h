@@ -25,8 +25,9 @@ public:
   void onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) override;
 
 private:
-  enum Mode { CONNECTING, GRID, HOST_EDIT, FAILED };
+  enum Mode { CONNECTING, GRID, HOST_EDIT, HELP, FAILED };
   Mode _mode = CONNECTING;
+  Mode _helpReturnTo = HOST_EDIT;
 
   Preferences* _prefs;
 
@@ -44,9 +45,11 @@ private:
   uint8_t _sceneCount = 0;
   bool _scenesLoaded = false; // false => grid falls back to plain numbers
 
-  UI::Button _refreshBtn{{Cfg::SCREEN_W - 118, Cfg::STATUS_BAR_H + 2, 52, 22}, "Sync"};
-  UI::Button _editBtn{{Cfg::SCREEN_W - 62, Cfg::STATUS_BAR_H + 2, 56, 22}, "Edit"};
+  UI::Button _refreshBtn{{Cfg::SCREEN_W - 128, Cfg::STATUS_BAR_H + 2, 44, 22}, "Sync"};
+  UI::Button _editBtn{{Cfg::SCREEN_W - 80, Cfg::STATUS_BAR_H + 2, 44, 22}, "Edit"};
+  UI::Button _helpBtn{{Cfg::SCREEN_W - 32, Cfg::STATUS_BAR_H + 2, 28, 22}, "?"};
   UI::Button _retryBtn{{Cfg::SCREEN_W / 2 - 60, Cfg::SCREEN_H / 2 + 20, 120, 34}, "Retry"};
+  UI::Button _helpBackBtn{{4, Cfg::SCREEN_H - 36, 90, 30}, "Back"};
 
   int8_t _sendingIdx = -1;   // scene currently mid-request (blocking, but drawn first)
   int8_t _feedbackIdx = -1;  // scene showing a just-finished result
@@ -70,4 +73,5 @@ private:
   void drawFailed(TFT_eSPI& tft);
   void drawGrid(TFT_eSPI& tft);
   void drawHostEdit(TFT_eSPI& tft);
+  void drawHelp(TFT_eSPI& tft);
 };
