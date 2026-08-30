@@ -10,6 +10,11 @@ cloud service required to build or use it.
 
 ## Apps
 
+The home screen is a 3x3 grid per page; swipe left/right when there are
+more than nine apps (a row of dots at the bottom shows which page you're
+on). A tap opens a tile, a drag past a small threshold flips the page -
+same gesture the rest of the launcher uses to tell a tap from a drag.
+
 - **WiFi Radar** — sweeping radar view of nearby networks. Each SSID gets
   a stable blip position; distance from center tracks signal strength, so
   walking toward a stronger signal visibly pulls its blip inward. Tap a

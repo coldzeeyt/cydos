@@ -174,8 +174,8 @@
     }
     return null;
   }
-  function registerHit(x, y, w, h, onDown, onDrag) {
-    hitboxes.push({ x, y, w, h, onDown, onDrag });
+  function registerHit(x, y, w, h, onDown, onDrag, onUp) {
+    hitboxes.push({ x, y, w, h, onDown, onDrag, onUp });
   }
 
   function roundRect(x, y, w, h, r) {
@@ -342,6 +342,7 @@
     timerAlarmUntil: 0,
     browserMode: 'url', browserUrl: 'example.com', browserLoading: false,
     browserLines: [], browserScroll: 0, browserLinesVisible: 0,
+    homePage: 0, homeDragStartX: 0, homeDragStartY: 0, homeDragOffsetX: 0, homeIsSwipe: false,
   };
 
   const TILES = [
@@ -376,22 +377,82 @@
     if (id === 'settings') S.settingsMode = 'main';
   }
 
-  function drawHome() {
-    clearContent();
-    const cols = 3, rows = Math.ceil(TILES.length / cols);
-    const tw = W / cols, th = (H - STATUS_H) / rows;
-    TILES.forEach(function (tile, i) {
-      const col = i % cols, row = Math.floor(i / cols);
-      const x = col * tw, y = STATUS_H + row * th;
+  const HOME_COLS = 3, HOME_ROWS = 3, HOME_TILES_PER_PAGE = HOME_COLS * HOME_ROWS;
+  const HOME_SWIPE_MOVE_THRESHOLD = 10, HOME_SWIPE_PAGE_THRESHOLD = 50;
+
+  function homePageCount() { return Math.ceil(TILES.length / HOME_TILES_PER_PAGE); }
+
+  function homeTileRectInPage(i) {
+    const col = i % HOME_COLS, row = Math.floor(i / HOME_COLS);
+    const dotsH = homePageCount() > 1 ? 14 : 0;
+    const contentH = H - STATUS_H - dotsH;
+    const tw = W / HOME_COLS, th = contentH / HOME_ROWS;
+    return { x: col * tw, y: STATUS_H + row * th, w: tw, h: th };
+  }
+
+  function homeTileAt(page, x, y) {
+    const start = page * HOME_TILES_PER_PAGE, end = Math.min(start + HOME_TILES_PER_PAGE, TILES.length);
+    for (let i = start; i < end; i++) {
+      const r = homeTileRectInPage(i - start);
+      if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return i;
+    }
+    return -1;
+  }
+
+  function drawHomePage(page, xOffset) {
+    const start = page * HOME_TILES_PER_PAGE, end = Math.min(start + HOME_TILES_PER_PAGE, TILES.length);
+    for (let i = start; i < end; i++) {
+      const cell = homeTileRectInPage(i - start);
       const pad = 4;
-      const cardX = x + pad, cardY = y + pad, cardW = tw - pad * 2, cardH = th - pad * 2;
+      const cardX = cell.x + xOffset + pad, cardY = cell.y + pad, cardW = cell.w - pad * 2, cardH = cell.h - pad * 2;
       roundRect(cardX, cardY, cardW, cardH, 8); ctx.fillStyle = Theme.panel; ctx.fill();
       const cx = cardX + cardW / 2, cy = cardY + cardH / 2 - 9;
       ctx.beginPath(); ctx.arc(cx, cy, 17, 0, Math.PI * 2); ctx.fillStyle = Theme.panel2; ctx.fill();
-      tile.icon(cx, cy, Theme.accent);
-      centerText(tile.name, cx, cardY + cardH - 12, '500 10px "IBM Plex Mono", monospace', Theme.text);
-      registerHit(x, y, tw, th, function () { openApp(tile.id); });
-    });
+      TILES[i].icon(cx, cy, Theme.accent);
+      centerText(TILES[i].name, cx, cardY + cardH - 12, '500 10px "IBM Plex Mono", monospace', Theme.text);
+    }
+  }
+
+  function drawHome() {
+    clearContent();
+    drawHomePage(S.homePage, S.homeDragOffsetX);
+
+    const pages = homePageCount();
+    if (pages > 1) {
+      const dotsY = H - 8;
+      const startX = W / 2 - (pages * 12) / 2 + 4;
+      for (let p = 0; p < pages; p++) {
+        const cx = startX + p * 12;
+        ctx.beginPath(); ctx.arc(cx, dotsY, 3, 0, Math.PI * 2);
+        if (p === S.homePage) { ctx.fillStyle = Theme.accent; ctx.fill(); }
+        else { ctx.strokeStyle = Theme.muted; ctx.stroke(); }
+      }
+    }
+
+    // One hitbox for the whole grid: a tap opens whatever tile was under the
+    // finger on release, a drag past the threshold flips the page - mirrors
+    // how the real firmware tells a tap from a swipe.
+    registerHit(0, STATUS_H, W, H - STATUS_H,
+      function (px, py) {
+        S.homeDragStartX = px; S.homeDragStartY = py;
+        S.homeDragOffsetX = 0; S.homeIsSwipe = false;
+      },
+      function (px, py) {
+        const dx = px - S.homeDragStartX;
+        if (Math.abs(dx) > HOME_SWIPE_MOVE_THRESHOLD) S.homeIsSwipe = true;
+        if (S.homeIsSwipe) S.homeDragOffsetX = dx;
+      },
+      function () {
+        if (S.homeIsSwipe) {
+          const pages = homePageCount();
+          if (S.homeDragOffsetX <= -HOME_SWIPE_PAGE_THRESHOLD && S.homePage + 1 < pages) S.homePage++;
+          else if (S.homeDragOffsetX >= HOME_SWIPE_PAGE_THRESHOLD && S.homePage > 0) S.homePage--;
+          S.homeDragOffsetX = 0;
+        } else {
+          const idx = homeTileAt(S.homePage, S.homeDragStartX, S.homeDragStartY);
+          if (idx >= 0) openApp(TILES[idx].id);
+        }
+      });
   }
 
   function drawStatusBar() {
@@ -944,7 +1005,7 @@
       onTap: function () { S.showBattery = !S.showBattery; },
     });
 
-    centerText('CydOs v1.3 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('CydOs v1.4 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
   }
 
   function drawSettingsTime() {
@@ -1135,7 +1196,10 @@
     const p = toCanvasCoords(clientX, clientY);
     if (activeHit.onDrag) activeHit.onDrag(p.x, p.y);
   }
-  function pointerUp() { activeHit = null; }
+  function pointerUp() {
+    if (activeHit && activeHit.onUp) activeHit.onUp();
+    activeHit = null;
+  }
 
   canvas.addEventListener('mousedown', function (e) { pointerDown(e.clientX, e.clientY); });
   window.addEventListener('mousemove', function (e) { pointerMove(e.clientX, e.clientY); });
