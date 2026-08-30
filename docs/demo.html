@@ -395,7 +395,7 @@
     filesPath: '/', filesPage: 0, filesSelected: -1, filesMode: 'browse', filesStatus: '', filesStatusUntil: 0,
     diagTab: 'display', diagPattern: 0, diagTouchX: -1, diagTouchY: -1,
     devMode: false, activeWallpaper: 'default', wpPreviewId: null,
-    storeMode: 'installed', storeBrowseState: 'notLoaded', storeItems: [], downloadedSdApps: [],
+    storeMode: 'installed', storeBrowseState: 'notLoaded', storeItems: [], downloadedSdApps: [], downloadedWallpapers: [],
     wifiSsid: '', wifiPass: '', settingsWifiField: 'ssid',
     wifiBusy: false, wifiBusyUntil: 0, wifiBusyNext: null,
     obsSyncError: false, spotifySyncError: false, storeDownloadError: null,
@@ -522,8 +522,26 @@
     { id: 'deep-space', name: 'Deep Space', from: '#140a2a', to: '#28c8b4' },
   ];
 
+  // Preset entries are flat gradients (no real image to show). A
+  // wallpaper actually downloaded via App Store > Get More carries the
+  // real decoded <img> instead - see downloadStoreItem() - drawn with
+  // the same cover-fit crop the real Wallpaper Creator tool uses.
+  function drawCoverImage(img, x, y, w, h) {
+    const scale = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+    const sw = w / scale, sh = h / scale;
+    const sx = (img.naturalWidth - sw) / 2, sy = (img.naturalHeight - sh) / 2;
+    ctx.drawImage(img, sx, sy, sw, sh, x, y, w, h);
+  }
+
+  function findWallpaper(id) {
+    return WALLPAPERS.find(function (w) { return w.id === id; })
+      || S.downloadedWallpapers.find(function (w) { return w.id === id; });
+  }
+
   function paintWallpaper(wp) {
-    if (wp && wp.from) {
+    if (wp && wp.img) {
+      drawCoverImage(wp.img, 0, STATUS_H, W, H - STATUS_H);
+    } else if (wp && wp.from) {
       const g = ctx.createLinearGradient(0, STATUS_H, 0, H);
       g.addColorStop(0, wp.from); g.addColorStop(1, wp.to);
       ctx.fillStyle = g; ctx.fillRect(0, STATUS_H, W, H - STATUS_H);
@@ -533,7 +551,7 @@
   }
 
   function drawHomeBackground() {
-    paintWallpaper(WALLPAPERS.find(function (w) { return w.id === S.activeWallpaper; }));
+    paintWallpaper(findWallpaper(S.activeWallpaper));
   }
 
   function drawHome() {
@@ -1703,12 +1721,17 @@
     // it makes the fetch relative to this page's own directory instead,
     // same as the manifest fetches above.
     const relPath = item.path.replace(/^\//, '');
-    fetch(relPath, { cache: 'no-store' }).then(function (r) {
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.text();
-    }).then(function (text) {
-      item.installed = true;
-      if (item.isApp) {
+    const fail = function () {
+      S.storeDownloadError = item.name;
+      setTimeout(function () { S.storeDownloadError = null; }, 3000);
+    };
+
+    if (item.isApp) {
+      fetch(relPath, { cache: 'no-store' }).then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.text();
+      }).then(function (text) {
+        item.installed = true;
         const app = { id: 'sdapp:' + item.slug, name: item.name, bg: '#0b0f16', lines: [] };
         text.split('\n').forEach(function (line) {
           const eq = line.indexOf('=');
@@ -1719,11 +1742,26 @@
           else if (key === 'text') app.lines.push(val);
         });
         S.downloadedSdApps.push(app);
-      }
-    }).catch(function () {
-      S.storeDownloadError = item.name;
-      setTimeout(function () { S.storeDownloadError = null; }, 3000);
-    });
+      }).catch(fail);
+      return;
+    }
+
+    // Wallpaper: fetch the real BMP bytes and decode them into an actual
+    // <img> (browsers decode BMP natively) instead of a fake gradient -
+    // so it renders on Home and shows up as a real, selectable option in
+    // Settings > Wallpapers, same as any preset.
+    fetch(relPath, { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.blob();
+    }).then(function (blob) {
+      const img = new Image();
+      img.onload = function () {
+        item.installed = true;
+        S.downloadedWallpapers.push({ id: 'wp:' + item.slug, name: item.name, img: img });
+      };
+      img.onerror = fail;
+      img.src = URL.createObjectURL(blob);
+    }).catch(fail);
   }
 
   function drawStoreBrowse() {
@@ -1937,8 +1975,14 @@
     button(10, STATUS_H + 6, 90, 30, '<- Back', { onTap: function () { S.settingsMode = 'main'; } });
     centerText('Wallpapers', W / 2, STATUS_H + 20, '600 13px "IBM Plex Mono", monospace', Theme.muted);
 
-    WALLPAPERS.forEach(function (wp, i) {
+    // Presets, plus anything actually downloaded via App Store > Get More
+    // (mirrors the real firmware: Settings > Wallpapers re-scans
+    // /cydos_wallpapers/ every time you open it, so a download shows up
+    // here without any extra step).
+    const allWallpapers = WALLPAPERS.concat(S.downloadedWallpapers);
+    allWallpapers.forEach(function (wp, i) {
       const r = wpRowRect(i);
+      if (r.y > H - 20) return;
       const active = S.activeWallpaper === wp.id;
       roundRect(r.x, r.y, r.w, r.h, 4);
       ctx.fillStyle = active ? Theme.accent : Theme.panel; ctx.fill();
@@ -1951,7 +1995,7 @@
   }
 
   function drawSettingsWallpaperPreview() {
-    const wp = WALLPAPERS.find(function (w) { return w.id === S.wpPreviewId; }) || WALLPAPERS[0];
+    const wp = findWallpaper(S.wpPreviewId) || WALLPAPERS[0];
     paintWallpaper(wp);
     button(50, 190, 100, 34, 'Use', { onTap: function () { S.activeWallpaper = wp.id; S.settingsMode = 'wallpapers'; } });
     button(170, 190, 100, 34, 'Cancel', { onTap: function () { S.settingsMode = 'wallpapers'; } });
@@ -2195,7 +2239,7 @@
     ctx.fillStyle = Theme.bg; ctx.fillRect(0, 0, W, H);
     // Same wallpaper as Home, plus flat panels behind the text so it stays
     // legible over a bright gradient instead of floating bare on top of it.
-    paintWallpaper(WALLPAPERS.find(function (w) { return w.id === S.activeWallpaper; }));
+    paintWallpaper(findWallpaper(S.activeWallpaper));
 
     const secs = Math.floor(S.clockOffsetSec + performance.now() / 1000) % 86400;
     const h = String(Math.floor(secs / 3600)).padStart(2, '0');
