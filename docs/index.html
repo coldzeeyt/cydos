@@ -164,7 +164,7 @@
       <span slot="not-allowed"><strong>Web Serial is blocked.</strong> This page needs to be loaded over https (it is) - check your browser hasn't disabled the Serial permission for it.</span>
     </esp-web-install-button>
 
-    <p class="fileinfo"><b>CydOs.bin</b> &middot; v1.0 &middot; ~1.1 MB &middot; bootloader + partitions + app, flashed at 0x0
+    <p class="fileinfo"><b>CydOs.bin</b> &middot; v1.0 &middot; <span id="binSize">size unknown</span> &middot; bootloader + partitions + app, flashed at 0x0
       &middot; <a href="firmware/CydOs.bin" download>download the .bin</a> to flash yourself with esptool or Arduino IDE</p>
   </div>
 
@@ -197,5 +197,17 @@
 </div>
 
 <script type="module" src="https://cdn.jsdelivr.net/npm/esp-web-tools@10/dist/web/install-button.js"></script>
+<script>
+  // The real file size, fetched live so this never goes stale again as
+  // the firmware grows - a hardcoded "~1.1 MB" here already drifted out
+  // of date once. Falls back to the placeholder text if the HEAD request
+  // fails for any reason (no Content-Length header, offline, etc).
+  fetch('firmware/CydOs.bin', { method: 'HEAD', cache: 'no-store' }).then(function (r) {
+    const len = r.headers.get('content-length');
+    if (!len) return;
+    const mb = (parseInt(len, 10) / (1024 * 1024)).toFixed(2);
+    document.getElementById('binSize').textContent = mb + ' MB';
+  }).catch(function () {});
+</script>
 </body>
 </html>

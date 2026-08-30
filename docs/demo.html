@@ -396,7 +396,24 @@
     diagTab: 'display', diagPattern: 0, diagTouchX: -1, diagTouchY: -1,
     devMode: false, activeWallpaper: 'default', wpPreviewId: null,
     storeMode: 'installed', storeBrowseState: 'notLoaded', storeItems: [], downloadedSdApps: [],
+    wifiSsid: '', wifiPass: '', settingsWifiField: 'ssid',
+    wifiBusy: false, wifiBusyUntil: 0, wifiBusyNext: null,
+    obsSyncError: false, spotifySyncError: false,
   };
+
+  // Fake WiFi, same shape as every real app's actual connect step
+  // (WiFi.begin() with the saved SSID/password, fail fast with nothing
+  // configured): a brief "Connecting..." beat, then success if a fake
+  // SSID has been typed into Settings > WiFi Setup, failure otherwise.
+  // Real hardware blocks synchronously during this; the demo can't (it's
+  // a single-threaded render loop), so it uses a short timed callback
+  // instead - see the wifiBusy check at the top of render().
+  function beginWifiConnect(onDone) {
+    if (!S.wifiSsid) { onDone(false); return; }
+    S.wifiBusy = true;
+    S.wifiBusyUntil = performance.now() + 900;
+    S.wifiBusyNext = function () { onDone(true); };
+  }
 
   const TILES = [
     { id: 'wifi', name: 'WiFi Radar', icon: iconWifi },
@@ -1287,9 +1304,19 @@
     ctx.fillStyle = S.obsHost ? Theme.muted : Theme.danger;
     ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
     ctx.fillText(S.obsHost || 'no companion host set', 8, STATUS_H + 13);
-    button(W - 128, STATUS_H + 2, 44, 22, 'Sync', { onTap: function () { S.obsScenes = OBS_DEMO_SCENES.slice(); } });
+    button(W - 128, STATUS_H + 2, 44, 22, 'Sync', {
+      onTap: function () {
+        beginWifiConnect(function (ok) {
+          S.obsSyncError = !ok;
+          if (ok) S.obsScenes = OBS_DEMO_SCENES.slice();
+        });
+      },
+    });
     button(W - 80, STATUS_H + 2, 44, 22, 'Edit', { onTap: function () { S.obsMode = 'hostEdit'; } });
     button(W - 32, STATUS_H + 2, 28, 22, '?', { onTap: function () { S.obsHelpReturnTo = 'grid'; S.obsMode = 'help'; } });
+    if (S.obsSyncError) {
+      centerText('No WiFi configured', W / 2, STATUS_H + 26, '500 9px "IBM Plex Mono", monospace', Theme.danger);
+    }
 
     for (let i = 0; i < OBS_NUM_SCENES; i++) {
       const cell = obsSceneRect(i);
@@ -1431,13 +1458,21 @@
     ctx.fillText(S.spotifyHost || 'no companion host set', 8, STATUS_H + 13);
     button(W - 118, STATUS_H + 2, 52, 22, 'Sync', {
       onTap: function () {
-        S.spotifyHasTrack = true; S.spotifyPlaying = true;
-        S.spotifyTrack = 'Sample Track'; S.spotifyArtist = 'A Demo Artist';
-        S.spotifyAlbum = 'Demo Album'; S.spotifyProgress = 68000; S.spotifyDuration = 210000;
+        beginWifiConnect(function (ok) {
+          S.spotifySyncError = !ok;
+          if (ok) {
+            S.spotifyHasTrack = true; S.spotifyPlaying = true;
+            S.spotifyTrack = 'Sample Track'; S.spotifyArtist = 'A Demo Artist';
+            S.spotifyAlbum = 'Demo Album'; S.spotifyProgress = 68000; S.spotifyDuration = 210000;
+          }
+        });
       },
     });
     button(W - 62, STATUS_H + 2, 56, 22, 'Edit', { onTap: function () { S.spotifyMode = 'hostEdit'; } });
     button(W - 148, STATUS_H + 2, 26, 22, '?', { onTap: function () { S.spotifyHelpReturnTo = 'nowPlaying'; S.spotifyMode = 'help'; } });
+    if (S.spotifySyncError) {
+      centerText('No WiFi configured', W / 2, STATUS_H + 30, '500 9px "IBM Plex Mono", monospace', Theme.danger);
+    }
 
     const midY = STATUS_H + 100;
     if (!S.spotifyHasTrack) {
@@ -1621,7 +1656,13 @@
       ctx.textAlign = 'left';
       registerHit(r.x, r.y, r.w, r.h, function () {
         S.storeMode = i === 0 ? 'installed' : 'browse';
-        if (S.storeMode === 'browse' && S.storeBrowseState === 'notLoaded') loadStoreBrowse();
+        if (S.storeMode === 'browse' && S.storeBrowseState !== 'loaded' && S.storeBrowseState !== 'loading') {
+          S.storeBrowseState = 'loading';
+          beginWifiConnect(function (ok) {
+            if (ok) loadStoreBrowse();
+            else S.storeBrowseState = 'noWifi';
+          });
+        }
       });
     });
   }
@@ -1672,6 +1713,11 @@
   function drawStoreBrowse() {
     if (S.storeBrowseState === 'loading') {
       centerText('Fetching catalog...', W / 2, H / 2, '500 11px "IBM Plex Mono", monospace', Theme.muted);
+      return;
+    }
+    if (S.storeBrowseState === 'noWifi') {
+      centerText('No WiFi configured', W / 2, H / 2 - 10, '500 12px "IBM Plex Mono", monospace', Theme.danger);
+      centerText('Set it up in Settings → WiFi Setup', W / 2, H / 2 + 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
       return;
     }
     if (S.storeBrowseState === 'failed') {
@@ -1840,7 +1886,7 @@
     centerText(S.brightness + '%', W / 2, 94, '600 11px "IBM Plex Mono", monospace', Theme.text);
 
     button(40, 106, 116, 28, 'Set Time', { onTap: function () { S.settingsMode = 'time'; } });
-    button(164, 106, 116, 28, 'WiFi Setup', { color: Theme.panel2, textColor: Theme.muted });
+    button(164, 106, 116, 28, 'WiFi Setup', { onTap: function () { S.settingsMode = 'wifi'; } });
     button(40, 140, W - 80, 24, 'Battery Icon: ' + (S.showBattery ? 'ON' : 'OFF'), {
       onTap: function () { S.showBattery = !S.showBattery; },
     });
@@ -1891,6 +1937,74 @@
     button(170, 190, 100, 34, 'Cancel', { onTap: function () { S.settingsMode = 'wallpapers'; } });
   }
 
+  // Real fake WiFi credentials - used by App Store > Get More, OBS Sync,
+  // and Spotify Sync via beginWifiConnect() above. Same shape as the real
+  // SettingsApp::drawWifi/drawWifiKeyboard: two tap-to-type fields, a
+  // Save button, no live "test connection" (there's nothing real to
+  // connect to in a browser tab).
+  function wifiFieldBox(field) {
+    return field === 'ssid'
+      ? { x: 30, y: STATUS_H + 40, w: W - 60, h: 34 }
+      : { x: 30, y: STATUS_H + 84, w: W - 60, h: 34 };
+  }
+
+  function drawSettingsWifi() {
+    clearContent();
+    button(10, STATUS_H + 6, 90, 30, '<- Back', { onTap: function () { S.settingsMode = 'main'; } });
+    centerText('WiFi Setup', W / 2, STATUS_H + 20, '600 13px "IBM Plex Mono", monospace', Theme.muted);
+
+    const ssidBox = wifiFieldBox('ssid');
+    roundRect(ssidBox.x, ssidBox.y, ssidBox.w, ssidBox.h, 6); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = S.wifiSsid ? Theme.text : Theme.muted;
+    ctx.font = '600 12px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    ctx.fillText(S.wifiSsid || 'SSID - tap to type', ssidBox.x + 10, ssidBox.y + ssidBox.h / 2 + 1);
+    ctx.textAlign = 'left';
+    registerHit(ssidBox.x, ssidBox.y, ssidBox.w, ssidBox.h, function () {
+      S.settingsWifiField = 'ssid';
+      S.settingsMode = 'wifiKeyboard';
+    });
+
+    const passBox = wifiFieldBox('pass');
+    roundRect(passBox.x, passBox.y, passBox.w, passBox.h, 6); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = S.wifiPass ? Theme.text : Theme.muted;
+    ctx.textAlign = 'left';
+    ctx.fillText(S.wifiPass ? '*'.repeat(S.wifiPass.length) : 'Password - tap to type', passBox.x + 10, passBox.y + passBox.h / 2 + 1);
+    registerHit(passBox.x, passBox.y, passBox.w, passBox.h, function () {
+      S.settingsWifiField = 'pass';
+      S.settingsMode = 'wifiKeyboard';
+    });
+
+    centerText(S.wifiSsid ? 'saved - anything that uses WiFi will "connect" to this' : 'nothing saved - WiFi actions will fail',
+      W / 2, H - 16, '500 9px "IBM Plex Mono", monospace', Theme.muted);
+  }
+
+  const WIFI_KB_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm', '-_.@!'];
+
+  function drawSettingsWifiKeyboard() {
+    clearContent();
+    const field = S.settingsWifiField === 'ssid' ? 'wifiSsid' : 'wifiPass';
+    roundRect(4, STATUS_H + 2, W - 8, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = S[field] ? Theme.text : Theme.muted;
+    ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    const shown = S.settingsWifiField === 'pass' ? '*'.repeat(S[field].length) : S[field];
+    ctx.fillText(shown || ('type your ' + (S.settingsWifiField === 'ssid' ? 'SSID' : 'password')), 10, STATUS_H + 15);
+
+    const top = STATUS_H + 30, rowH = 24;
+    WIFI_KB_ROWS.forEach(function (row, r) {
+      const keyW = W / row.length;
+      for (let c = 0; c < row.length; c++) {
+        const x = c * keyW + 1, y = top + r * rowH;
+        const ch = row[c];
+        button(x, y, keyW - 2, rowH - 4, ch, { onTap: function () { if (S[field].length < 64) S[field] += ch; } });
+      }
+    });
+
+    const ctrlY = top + WIFI_KB_ROWS.length * rowH + 4;
+    button(4, ctrlY, 100, 26, 'DEL', { onTap: function () { S[field] = S[field].slice(0, -1); } });
+    button(108, ctrlY, 90, 26, 'CLR', { onTap: function () { S[field] = ''; } });
+    button(202, ctrlY, 114, 26, 'Done', { onTap: function () { S.settingsMode = 'wifi'; } });
+  }
+
   function drawSettingsTime() {
     clearContent();
     button(10, STATUS_H + 6, 90, 30, '<- Back', { onTap: function () { S.settingsMode = 'main'; } });
@@ -1908,6 +2022,8 @@
     if (S.settingsMode === 'time') drawSettingsTime();
     else if (S.settingsMode === 'wallpapers') drawSettingsWallpapers();
     else if (S.settingsMode === 'wallpaperPreview') drawSettingsWallpaperPreview();
+    else if (S.settingsMode === 'wifi') drawSettingsWifi();
+    else if (S.settingsMode === 'wifiKeyboard') drawSettingsWifiKeyboard();
     else drawSettingsMain();
   }
 
@@ -2084,6 +2200,19 @@
     resetHitboxes();
     ctx.clearRect(0, 0, W, H);
     if (S.locked) { drawLockScreen(); requestAnimationFrame(render); return; }
+    if (S.wifiBusy) {
+      if (t >= S.wifiBusyUntil) {
+        S.wifiBusy = false;
+        const next = S.wifiBusyNext;
+        S.wifiBusyNext = null;
+        if (next) next();
+      } else {
+        drawStatusBar();
+        centerText('Connecting to WiFi...', W / 2, H / 2, '500 12px "IBM Plex Mono", monospace', Theme.muted);
+        requestAnimationFrame(render);
+        return;
+      }
+    }
     updateClock();
     updateDice(t);
     updateMorse(t);

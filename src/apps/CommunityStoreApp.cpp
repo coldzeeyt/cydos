@@ -208,12 +208,12 @@ void CommunityStoreApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) 
 
   for (uint8_t i = 0; i < 2; i++) {
     if (tabRect(i).contains(x, y)) {
-      Mode newMode = (Mode)i;
-      if (newMode != _mode) {
-        _mode = newMode;
-        if (_mode == BROWSE && _browseState == NOT_LOADED) loadBrowseCatalog(tft);
-        _dirty = true;
-      }
+      _mode = (Mode)i;
+      // Retries on every tap until it actually succeeds, not just the
+      // first one - lets you fix WiFi in Settings and come straight back
+      // without leaving and re-entering the whole app.
+      if (_mode == BROWSE && _browseState != LOADED) loadBrowseCatalog(tft);
+      _dirty = true;
       return;
     }
   }

@@ -155,7 +155,7 @@ void SettingsApp::drawTouchTest(TFT_eSPI& tft) {
 void SettingsApp::drawWifi(TFT_eSPI& tft) {
   UI::clearContent(tft);
   _backBtn.draw(tft);
-  UI::centerText(tft, "WiFi Setup (for update checks)", Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 20, 1, Theme::MUTED);
+  UI::centerText(tft, "WiFi Setup", Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 20, 1, Theme::MUTED);
 
   UI::Rect ssidBox = wifiSsidBox();
   tft.fillRoundRect(ssidBox.x, ssidBox.y, ssidBox.w, ssidBox.h, 6, Theme::PANEL);
