@@ -96,6 +96,13 @@ void setup() {
   homeApp.addTile(UI::iconBroadcast, obsIdx);
   homeApp.addTile(UI::iconGear, settingsIdx);
 
+  // Community apps (see community-apps/ and scripts/generate_community.py):
+  // this file is a no-op stub in a normal checkout, so `pio run -e cyd`
+  // builds the standard firmware untouched. The Community Edition build
+  // (CI, or `python3 scripts/generate_community.py` run locally first)
+  // overwrites it with one registerApp()+addTile() block per submitted app.
+#include "community_registration.inc"
+
   appManager.openApp(homeIdx);
 }
 

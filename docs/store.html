@@ -1,0 +1,410 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CydOs App Store</title>
+<style>
+  :root {
+    --bg: #f3f6f8;
+    --grain: rgba(20, 34, 46, 0.035);
+    --panel: #ffffff;
+    --panel-2: #eaeff3;
+    --border: rgba(18, 30, 40, 0.12);
+    --text: #101820;
+    --muted: #5c6c7a;
+    --accent: #0891a8;
+    --accent-soft: rgba(8, 145, 168, 0.12);
+    --accent-ink: #ffffff;
+    --amber: #a8660a;
+    --good: #16874a;
+    --danger: #c22a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #090d13;
+      --grain: rgba(120, 200, 220, 0.035);
+      --panel: #121a24;
+      --panel-2: #1a2530;
+      --border: rgba(200, 225, 240, 0.1);
+      --text: #eaf2f8;
+      --muted: #7f8fa3;
+      --accent: #26d6f0;
+      --accent-soft: rgba(38, 214, 240, 0.14);
+      --accent-ink: #04222a;
+      --amber: #ffb020;
+      --good: #34d399;
+      --danger: #ff8080;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #090d13;
+    --grain: rgba(120, 200, 220, 0.035);
+    --panel: #121a24;
+    --panel-2: #1a2530;
+    --border: rgba(200, 225, 240, 0.1);
+    --text: #eaf2f8;
+    --muted: #7f8fa3;
+    --accent: #26d6f0;
+    --accent-soft: rgba(38, 214, 240, 0.14);
+    --accent-ink: #04222a;
+    --amber: #ffb020;
+    --good: #34d399;
+    --danger: #ff8080;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background:
+      repeating-linear-gradient(0deg, var(--grain) 0px, var(--grain) 1px, transparent 1px, transparent 3px),
+      var(--bg);
+    color: var(--text);
+    font-family: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    line-height: 1.55;
+    min-height: 100vh;
+    margin: 0;
+    padding: 40px 20px 64px;
+  }
+  h1, h2, h3, .mono, .eyebrow, .num, .devicebar, .fileinfo, code, .pill { font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace; }
+  .wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+
+  .devicebar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 14px; font-size: 12.5px; letter-spacing: 0.04em; color: var(--muted);
+  }
+  .devicebar .brand { color: var(--text); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .devicebar .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--good); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .devicebar nav a {
+    color: var(--muted); text-decoration: none; font-size: 11.5px; letter-spacing: 0.08em;
+    text-transform: uppercase; padding: 4px 8px; border-radius: 6px;
+  }
+  .devicebar nav a:hover { color: var(--text); background: var(--panel-2); }
+  .devicebar nav a.active { color: var(--accent-ink); background: var(--accent); }
+
+  .hero { text-align: left; }
+  .eyebrow {
+    display: inline-block; font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em;
+    color: var(--accent); text-transform: uppercase; margin: 0 0 10px;
+  }
+  h1 { font-size: clamp(28px, 5.5vw, 38px); font-weight: 700; margin: 0 0 12px; letter-spacing: -0.01em; text-wrap: balance; }
+  .lede { color: var(--muted); font-size: 15px; max-width: 58ch; margin: 0 0 8px; }
+
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px 24px; }
+  .panel h2 { font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin: 0 0 16px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    padding: 18px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .card .icon { font-size: 26px; line-height: 1; }
+  .card h3 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: 0; }
+  .card .author { font-size: 11.5px; color: var(--muted); letter-spacing: 0.02em; }
+  .card p { margin: 0; font-size: 13px; color: var(--muted); flex: 1; }
+  .card a.repo {
+    font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  .card a.repo:hover { text-decoration: underline; }
+
+  .empty {
+    text-align: center; padding: 46px 20px; color: var(--muted);
+    border: 1px dashed var(--border); border-radius: 14px; background: var(--panel);
+  }
+  .empty .big { font-size: 30px; margin-bottom: 10px; }
+  .empty p { max-width: 44ch; margin: 6px auto 0; font-size: 14px; }
+  .empty a { color: var(--accent); font-weight: 600; text-decoration: none; }
+  .empty a:hover { text-decoration: underline; }
+
+  ol.steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+  ol.steps li { display: flex; gap: 14px; align-items: baseline; }
+  ol.steps .num {
+    flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--panel-2);
+    border: 1px solid var(--border); color: var(--accent); font-size: 12px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  ol.steps div { font-size: 14.5px; }
+  ol.steps strong { font-weight: 600; }
+  ol.steps code { background: var(--panel-2); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 12.5px; }
+
+  .notice { font-size: 13.5px; color: var(--muted); border: 1px dashed var(--border); border-radius: 8px; padding: 12px 14px; }
+  .notice strong { color: var(--text); }
+
+  .formgrid { display: grid; gap: 14px; margin-bottom: 16px; }
+  .formgrid label { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  .formgrid label[hidden] { display: none; }
+  .formgrid input[type="text"], .formgrid input[type="file"] {
+    font-family: "IBM Plex Sans", sans-serif; font-size: 14px; color: var(--text);
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 9px 11px;
+  }
+  .formgrid input[type="text"]::placeholder { color: var(--muted); opacity: 0.7; }
+  .formgrid input[type="text"]:focus, .formgrid input[type="file"]:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .genbtn {
+    appearance: none; border: none; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink);
+    font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 13.5px;
+    padding: 11px 18px; border-radius: 9px;
+  }
+  .genbtn:hover { opacity: 0.92; }
+
+  .install-btn-sm {
+    display: inline-flex; align-items: center; gap: 8px;
+    appearance: none; border: none; cursor: pointer; text-decoration: none;
+    background: var(--accent); color: var(--accent-ink);
+    font-family: "IBM Plex Mono", monospace; font-weight: 600; font-size: 13.5px;
+    padding: 11px 18px; border-radius: 9px;
+  }
+  .install-btn-sm:hover { opacity: 0.92; }
+  .install-btn-sm[hidden] { display: none; }
+
+  #genBody {
+    width: 100%; min-height: 160px; margin-top: 8px; resize: vertical;
+    font-family: "IBM Plex Mono", monospace; font-size: 11.5px; color: var(--text);
+    background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 10px;
+  }
+
+  .install-panel { display: flex; flex-direction: column; gap: 12px; }
+  .install-panel .row { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+  footer { text-align: center; font-size: 12px; color: var(--muted); padding-top: 8px; }
+  footer a { color: var(--accent); }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="wrap">
+  <div class="devicebar">
+    <span class="brand"><span class="dot"></span>CydOs</span>
+    <nav>
+      <a href="index.html">Flash</a>
+      <a href="demo.html">Demo</a>
+      <a href="store.html" class="active">Store</a>
+      <a href="https://github.com/coldzeeyt/cydos">Source</a>
+    </nav>
+  </div>
+
+  <div class="hero">
+    <p class="eyebrow">Community Apps</p>
+    <h1>The CydOs App Store</h1>
+    <p class="lede">A directory of apps other people built for CydOs. Being honest about how this works: the CYD has no OTA or app-loading system, so nothing here installs itself - each entry is source you pull into your own build and reflash, same as the apps that ship in the box.</p>
+  </div>
+
+  <div id="installBlock"></div>
+
+  <div id="catalog"></div>
+
+  <div class="panel">
+    <h2>How "installing" an app actually works</h2>
+    <p class="lede" style="margin-bottom:16px;">Once your app is merged, it's not sitting in some marketplace waiting to be downloaded onto a running device - a GitHub Action automatically rebuilds the <strong>Community Edition</strong> firmware (every merged app baked into one image) and republishes it right here. Flashing that one file, with the same one-click installer as the main <a href="index.html" style="color: var(--accent); font-weight: 600;">Flash</a> page, is the "load it onto your CYD" step - no PlatformIO, no git, no code, on your end.</p>
+    <ol class="steps">
+      <li><span class="num">1</span><div>Implement the <code>App</code> interface (<code>onEnter</code>/<code>update</code>/<code>draw</code>/<code>onTouch</code> - see <a href="https://github.com/coldzeeyt/cydos/blob/main/src/apps/App.h" style="color: var(--accent);">App.h</a>) in one self-contained header file.</div></li>
+      <li><span class="num">2</span><div>Fill out the form below and generate a submission - it packages your app's name/author/icon/description and code into a pre-filled GitHub issue.</div></li>
+      <li><span class="num">3</span><div>Open the issue. A maintainer turns it into a pull request - this is the human review step before any code ends up in something flashed to someone else's hardware.</div></li>
+      <li><span class="num">4</span><div>Once merged, CI rebuilds <code>CydOsCommunity.bin</code> automatically and it appears in the "Install Community Edition" section above and the gallery below - usually within a couple minutes.</div></li>
+    </ol>
+    <p class="notice" style="margin-top:16px;"><strong>Prefer to do it yourself with git?</strong> See <a href="https://github.com/coldzeeyt/cydos/blob/main/CONTRIBUTING.md" style="color: var(--accent);">CONTRIBUTING.md</a> for the <code>community-apps/&lt;slug&gt;/app.json</code> format and how to open the PR directly.</p>
+  </div>
+
+  <div class="panel">
+    <h2>Generate a submission</h2>
+    <p class="lede" style="margin-bottom:14px;">This runs entirely in your browser - nothing is uploaded until you click "Open issue on GitHub" yourself.</p>
+    <div class="formgrid">
+      <label>App name<input id="fName" type="text" placeholder="Reversi" maxlength="40"></label>
+      <label>Your name / handle<input id="fAuthor" type="text" placeholder="jdoe" maxlength="40"></label>
+      <label>Icon (one emoji, shown on this page only)<input id="fIcon" type="text" placeholder="🔴" maxlength="8"></label>
+      <label>One-line description<input id="fDesc" type="text" placeholder="Classic Othello/Reversi against a simple AI." maxlength="140"></label>
+      <label>Link to your code (optional - a fork, gist, etc.)<input id="fRepo" type="text" placeholder="https://github.com/you/cydos-reversi"></label>
+      <label>Your app's header file (.h)<input id="fFile" type="file" accept=".h,.hpp,text/plain"></label>
+      <label id="fClassWrap" hidden>C++ class name (couldn't auto-detect it)<input id="fClass" type="text" placeholder="ReversiApp"></label>
+    </div>
+    <button id="genBtn" class="genbtn" type="button">Generate submission</button>
+    <div id="genOut" hidden>
+      <p class="notice" id="genNotice" style="margin-top:16px;"></p>
+      <a id="genLink" class="install-btn-sm" target="_blank" rel="noopener" hidden>Open issue on GitHub &rarr;</a>
+      <p style="font-size:12.5px; color: var(--muted); margin: 14px 0 6px;">Or copy this and paste it into a <a href="https://github.com/coldzeeyt/cydos/issues/new" style="color: var(--accent);">new GitHub issue</a> yourself:</p>
+      <textarea id="genBody" readonly></textarea>
+    </div>
+  </div>
+
+  <footer>Nothing on this page runs on your device by itself except what you explicitly flash. &middot; <a href="https://github.com/coldzeeyt/cydos">View source</a></footer>
+</div>
+
+<script>
+  const catalogEl = document.getElementById('catalog');
+
+  function escapeHtml(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // escapeHtml alone doesn't protect an attribute value (browsers only
+  // escape & < > in text-node serialization, not " '), so href="${...}"
+  // needs this too - matters even though store.json is PR-reviewed, not
+  // arbitrary live input.
+  function attrSafe(s) {
+    return escapeHtml(s).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  function renderEmpty() {
+    catalogEl.innerHTML = `
+      <div class="empty">
+        <div class="big">&#128230;</div>
+        <strong>No community apps yet.</strong>
+        <p>Nobody's submitted one - be the first. See "Generate a submission" below for how to add yours to this page.</p>
+      </div>`;
+  }
+
+  function renderCards(apps) {
+    const cards = apps.map(function (app) {
+      const icon = app.icon ? escapeHtml(app.icon) : '&#129513;';
+      const name = escapeHtml(app.name || 'Untitled');
+      const author = app.author ? 'by ' + escapeHtml(app.author) : '';
+      const desc = escapeHtml(app.description || '');
+      const repoOk = typeof app.repo === 'string' && /^https:\/\//.test(app.repo);
+      const repo = repoOk ? attrSafe(app.repo) : null;
+      return `
+        <div class="card">
+          <div class="icon">${icon}</div>
+          <h3>${name}</h3>
+          <div class="author">${author}</div>
+          <p>${desc}</p>
+          ${repo ? `<a class="repo" href="${repo}">View source &rarr;</a>` : ''}
+        </div>`;
+    }).join('');
+    catalogEl.innerHTML = `<div class="grid">${cards}</div>`;
+  }
+
+  const installEl = document.getElementById('installBlock');
+
+  function renderInstall(hasApps) {
+    if (!hasApps) { installEl.innerHTML = ''; return; }
+    installEl.innerHTML = `
+      <div class="panel install-panel">
+        <h2>Install Community Edition</h2>
+        <p style="margin:0; font-size: 14px; color: var(--muted);">Every app below, baked into one firmware image, rebuilt automatically whenever one is merged. It's newer and far less tested than the <a href="index.html" style="color: var(--accent); font-weight: 600;">official build</a> - each app is reviewed before merge, but only the base CydOs firmware gets real hands-on testing before release.</p>
+        <div class="row">
+          <esp-web-install-button manifest="community-manifest.json">
+            <button slot="activate" class="install-btn-sm" type="button">Install Community Edition &rarr;</button>
+            <span slot="unsupported" class="notice">Needs Chrome or Edge on desktop (Web Serial).</span>
+            <span slot="not-allowed" class="notice">Web Serial is blocked for this page.</span>
+          </esp-web-install-button>
+          <a href="firmware/CydOsCommunity.bin" download style="font-size:12.5px; color: var(--accent);">or download the .bin</a>
+        </div>
+      </div>`;
+  }
+
+  fetch('store.json', { cache: 'no-store' })
+    .then(function (r) { return r.json(); })
+    .then(function (apps) {
+      const hasApps = Array.isArray(apps) && apps.length > 0;
+      renderInstall(hasApps);
+      if (!hasApps) renderEmpty();
+      else renderCards(apps);
+    })
+    .catch(function () { renderEmpty(); });
+
+  // ---------- Submission generator ----------
+  const genBtn = document.getElementById('genBtn');
+  const fFile = document.getElementById('fFile');
+  const fClassWrap = document.getElementById('fClassWrap');
+  const genOut = document.getElementById('genOut');
+  const genNotice = document.getElementById('genNotice');
+  const genLink = document.getElementById('genLink');
+  const genBody = document.getElementById('genBody');
+
+  function slugify(name) {
+    return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'my-app';
+  }
+
+  function readFileText(file) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = reject;
+      reader.readAsText(file);
+    });
+  }
+
+  genBtn.addEventListener('click', function () {
+    const name = document.getElementById('fName').value.trim();
+    const author = document.getElementById('fAuthor').value.trim();
+    const icon = document.getElementById('fIcon').value.trim();
+    const desc = document.getElementById('fDesc').value.trim();
+    const repo = document.getElementById('fRepo').value.trim();
+    const file = fFile.files[0];
+
+    if (!name || !author || !icon || !desc || !file) {
+      genOut.hidden = false;
+      genLink.hidden = true;
+      genBody.value = '';
+      genNotice.textContent = 'Fill in name, your name, an icon, a description, and pick your header file first.';
+      return;
+    }
+
+    readFileText(file).then(function (code) {
+      // Strip comments before matching, so a doc comment that happens to
+      // mention "class Foo : public App" doesn't get picked up as real code.
+      const codeNoComments = code.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, '');
+      const classMatch = codeNoComments.match(/class\s+(\w+)\s*:\s*public\s+App\b/);
+      let className = classMatch ? classMatch[1] : document.getElementById('fClass').value.trim();
+      if (!className) {
+        fClassWrap.hidden = false;
+        genOut.hidden = false;
+        genLink.hidden = true;
+        genBody.value = '';
+        genNotice.textContent = "Couldn't find \"class YourApp : public App\" in that file - type the class name above and generate again.";
+        return;
+      }
+      fClassWrap.hidden = true;
+
+      const slug = slugify(name);
+      const appJson = {
+        name: name, author: author, description: desc, icon: icon,
+        class: className, header: file.name, sources: [file.name],
+      };
+      if (repo) appJson.repo = repo;
+
+      const body = [
+        '**New CydOs app submission**',
+        '',
+        'This will become `community-apps/' + slug + '/`. A maintainer will turn this into a PR (or you can, see CONTRIBUTING.md).',
+        '',
+        '`community-apps/' + slug + '/app.json`:',
+        '```json',
+        JSON.stringify(appJson, null, 2),
+        '```',
+        '',
+        '`community-apps/' + slug + '/' + file.name + '`:',
+        '~~~cpp',
+        code,
+        '~~~',
+      ].join('\n');
+
+      genBody.value = body;
+      genOut.hidden = false;
+
+      const title = 'App submission: ' + name;
+      const url = 'https://github.com/coldzeeyt/cydos/issues/new?title=' +
+        encodeURIComponent(title) + '&labels=' + encodeURIComponent('app-submission') +
+        '&body=' + encodeURIComponent(body);
+
+      if (url.length < 7000) {
+        genLink.href = url;
+        genLink.hidden = false;
+        genNotice.textContent = 'Looks good - click below to open a pre-filled GitHub issue (opens in a new tab, nothing is sent until you post it there).';
+      } else {
+        genLink.hidden = true;
+        genNotice.textContent = 'Your app is long enough that a pre-filled link would break - copy the text below into a new GitHub issue instead.';
+      }
+    });
+  });
+</script>
+<script type="module" src="https://cdn.jsdelivr.net/npm/esp-web-tools@10/dist/web/install-button.js"></script>
+</body>
+</html>

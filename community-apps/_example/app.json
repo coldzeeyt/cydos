@@ -1,0 +1,10 @@
+{
+  "name": "Hello Community",
+  "author": "CydOs",
+  "description": "Reference template - copy this folder to start your own app.",
+  "icon": "👋",
+  "repo": "https://github.com/coldzeeyt/cydos/tree/main/community-apps/_example",
+  "class": "HelloCommunityApp",
+  "header": "HelloCommunityApp.h",
+  "sources": ["HelloCommunityApp.h"]
+}

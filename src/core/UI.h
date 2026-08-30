@@ -180,4 +180,12 @@ inline void iconBroadcast(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.drawLine(cx + 8, cy - 9, cx + 14, cy - 16, c);
 }
 
+// Generic tile icon for community-submitted apps - a puzzle piece, since a
+// submitted app brings its own screen but not its own icon-drawing code.
+inline void iconPuzzle(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.drawRoundRect(cx - 13, cy - 13, 26, 26, 3, c);
+  tft.drawCircle(cx + 6, cy - 13, 4, c);
+  tft.drawCircle(cx - 13, cy + 6, 4, c);
+}
+
 } // namespace UI

@@ -10,7 +10,10 @@
 // active App. Index 0 is always the Home launcher.
 class AppManager {
 public:
-  static constexpr uint8_t MAX_APPS = 16;
+  // 12 built-in apps + headroom for community apps (see
+  // scripts/generate_community.py, which enforces its own smaller cap so a
+  // bad community build fails loudly in CI well before this limit matters).
+  static constexpr uint8_t MAX_APPS = 24;
 
   void begin(TFT_eSPI& tft, Battery* battery, UpdateChecker* updates = nullptr) {
     _tft = &tft;
@@ -18,7 +21,11 @@ public:
     _updates = updates;
   }
 
+  // Returns 0xFF (and drops the app) if MAX_APPS is already full, rather
+  // than writing past the end of _apps - matters now that the app list
+  // isn't a fixed, known-at-a-glance count (community builds add to it).
   uint8_t registerApp(App* app) {
+    if (_count >= MAX_APPS) return 0xFF;
     _apps[_count] = app;
     return _count++;
   }

@@ -73,6 +73,25 @@ partitions + app in one file, built from `pio run` and
 `esptool.py merge_bin`); rebuild and copy it there after firmware changes,
 or the web flasher will keep serving stale firmware.
 
+## App Store
+
+[**coldzeeyt.github.io/cydos/store.html**](https://coldzeeyt.github.io/cydos/store.html)
+— a directory of apps other people have built for CydOs, plus a one-click
+way to actually run them. Worth being upfront about what this is: the CYD
+has no OTA or app-loading system, so nothing installs itself while it's
+running — but once a submitted app is reviewed and merged, a GitHub
+Action automatically bakes every merged app into a **Community Edition**
+firmware and republishes it, so getting one onto your device is still
+just "click Install" with the same web flasher as the main build. The
+official `CydOs.bin` above never changes because of this — Community
+Edition is a separate, opt-in, less-tested image.
+
+The store page also has a "Generate a submission" form: fill in your
+app's name/icon/description and upload its source, and it opens a
+pre-filled GitHub issue — no git required. It's empty until someone
+submits the first one. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the
+`App` interface and the full submission format.
+
 ## OBS scene switcher
 
 The OBS app talks directly to a small Python script that runs inside OBS
@@ -233,4 +252,6 @@ obs-script/              cydos_scene_switcher.py - the OBS-side companion script
 
 Adding a new app: implement the `App` interface in `src/apps/`, register
 it in `src/main.cpp` with `appManager.registerApp(&yourApp)`, and give it
-a launcher tile with `homeApp.addTile(iconFn, index)`.
+a launcher tile with `homeApp.addTile(iconFn, index)`. See
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the full interface and how to
+get it listed on the [App Store](#app-store) page.
