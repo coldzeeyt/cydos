@@ -1,0 +1,7 @@
+{
+  "name": "CydOs Community Edition",
+  "version": "community",
+  "builds": [
+    { "chipFamily": "ESP32", "parts": [ { "path": "firmware/CydOsCommunity.bin", "offset": 0 } ] }
+  ]
+}
