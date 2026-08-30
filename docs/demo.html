@@ -398,7 +398,7 @@
     storeMode: 'installed', storeBrowseState: 'notLoaded', storeItems: [], downloadedSdApps: [],
     wifiSsid: '', wifiPass: '', settingsWifiField: 'ssid',
     wifiBusy: false, wifiBusyUntil: 0, wifiBusyNext: null,
-    obsSyncError: false, spotifySyncError: false,
+    obsSyncError: false, spotifySyncError: false, storeDownloadError: null,
   };
 
   // Fake WiFi, same shape as every real app's actual connect step
@@ -1693,7 +1693,20 @@
 
   function downloadStoreItem(i) {
     const item = S.storeItems[i];
-    fetch(item.path, { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (text) {
+    // item.path is written for the firmware, which builds the full
+    // https://coldzeeyt.github.io/cydos/... URL itself (see
+    // src/core/AppStore.h) - a leading "/" there is correct for that.
+    // In a browser, though, a leading "/" is domain-root-relative, which
+    // is wrong once this page is served under a subpath like /cydos/ (a
+    // GitHub Pages project site, not a root site) - it silently 404s
+    // against the wrong host path instead of erroring loudly. Stripping
+    // it makes the fetch relative to this page's own directory instead,
+    // same as the manifest fetches above.
+    const relPath = item.path.replace(/^\//, '');
+    fetch(relPath, { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    }).then(function (text) {
       item.installed = true;
       if (item.isApp) {
         const app = { id: 'sdapp:' + item.slug, name: item.name, bg: '#0b0f16', lines: [] };
@@ -1707,7 +1720,10 @@
         });
         S.downloadedSdApps.push(app);
       }
-    }).catch(function () {});
+    }).catch(function () {
+      S.storeDownloadError = item.name;
+      setTimeout(function () { S.storeDownloadError = null; }, 3000);
+    });
   }
 
   function drawStoreBrowse() {
@@ -1741,6 +1757,10 @@
       ctx.textAlign = 'left';
       if (!item.installed) registerHit(btn.x, btn.y, btn.w, btn.h, function () { downloadStoreItem(i); });
     });
+
+    if (S.storeDownloadError) {
+      centerText('Download failed: ' + S.storeDownloadError, W / 2, H - 12, '500 9px "IBM Plex Mono", monospace', Theme.danger);
+    }
   }
 
   function drawDownloadedSdApp() {
