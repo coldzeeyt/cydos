@@ -1,1 +1,8 @@
-[]
+[
+  {
+    "name": "cool guy",
+    "author": "davidiot",
+    "description": "guy staring at you",
+    "image": "wallpapers/cool-guy.png"
+  }
+]
