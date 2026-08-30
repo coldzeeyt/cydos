@@ -933,6 +933,36 @@
     return null;
   }
 
+  // Dot/dash rendering of a message - letters separated by a space, words
+  // by " / " - so you can read the pattern being flashed, not just the text.
+  function buildMorseText(msg) {
+    let out = '';
+    let needLetterSpace = false;
+    for (const raw of msg.toLowerCase()) {
+      if (raw === ' ') { out += ' / '; needLetterSpace = false; continue; }
+      const code = morseFor(raw);
+      if (!code) continue;
+      if (needLetterSpace) out += ' ';
+      out += code;
+      needLetterSpace = true;
+    }
+    return out;
+  }
+
+  function drawWrappedCenter(text, cx, yStart, lineH, font, color, maxLines, maxWidth) {
+    ctx.font = font; ctx.fillStyle = color; ctx.textAlign = 'center';
+    const tokens = text.split(' ');
+    const lines = [];
+    let cur = '';
+    for (const tok of tokens) {
+      const test = cur ? cur + ' ' + tok : tok;
+      if (cur && ctx.measureText(test).width > maxWidth) { lines.push(cur); cur = tok; }
+      else cur = test;
+    }
+    if (cur) lines.push(cur);
+    lines.slice(0, maxLines).forEach(function (line, i) { ctx.fillText(line, cx, yStart + i * lineH); });
+  }
+
   function buildMorseSchedule(msg) {
     const steps = [];
     for (const raw of msg.toLowerCase()) {
@@ -977,7 +1007,13 @@
     ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
     ctx.fillText(S.morseText ? shown : 'type a message to flash...', 10, STATUS_H + 15);
 
-    const top = STATUS_H + 30, rowH = 26;
+    const morsePreview = buildMorseText(S.morseText);
+    const morseShown = morsePreview.length > 50 ? morsePreview.slice(-50) : morsePreview;
+    ctx.fillStyle = S.morseText ? Theme.accent : Theme.muted;
+    ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    ctx.fillText(S.morseText ? morseShown : 'morse code appears here...', 8, STATUS_H + 33);
+
+    const top = STATUS_H + 40, rowH = 26;
     MORSE_ROWS.forEach(function (row, r) {
       const keyW = W / row.length;
       for (let c = 0; c < row.length; c++) {
@@ -1002,9 +1038,12 @@
   }
 
   function drawMorseSending() {
+    const fg = S.morseOn ? Theme.bg : Theme.muted;
     ctx.fillStyle = S.morseOn ? Theme.text : Theme.bg;
     ctx.fillRect(0, STATUS_H, W, H - STATUS_H);
-    centerText(S.morseText, W / 2, STATUS_H + 30, '600 13px "IBM Plex Mono", monospace', S.morseOn ? Theme.bg : Theme.muted);
+    centerText(S.morseText, W / 2, STATUS_H + 26, '600 13px "IBM Plex Mono", monospace', fg);
+    drawWrappedCenter(buildMorseText(S.morseText), W / 2, STATUS_H + 54, 18,
+      '600 13px "IBM Plex Mono", monospace', fg, 5, W - 20);
     button(W / 2 - 50, H - 44, 100, 32, 'Stop', { onTap: function () { S.morseSending = false; } });
   }
 
@@ -1138,7 +1177,7 @@
       onTap: function () { S.showBattery = !S.showBattery; },
     });
 
-    centerText('CydOs v1.7 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('CydOs v1.8 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
   }
 
   function drawSettingsTime() {

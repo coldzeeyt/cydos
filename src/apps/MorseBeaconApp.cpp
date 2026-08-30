@@ -17,13 +17,64 @@ static const char* morseFor(char c) {
   return nullptr;
 }
 
+// Renders the dot/dash code for a message - letters separated by a space,
+// words by " / " - so you can read the pattern being flashed, not just the
+// plain-text message. `out` should be sized generously: a message full of
+// digits (5 symbols each) is the worst case.
+static void buildMorseText(const char* msg, char* out, size_t outCap) {
+  size_t pos = 0;
+  bool needLetterSpace = false;
+  for (const char* p = msg; *p; p++) {
+    char c = tolower(*p);
+    if (c == ' ') {
+      if (pos + 3 < outCap) { out[pos++] = ' '; out[pos++] = '/'; out[pos++] = ' '; }
+      needLetterSpace = false;
+      continue;
+    }
+    const char* code = morseFor(c);
+    if (!code) continue;
+    if (needLetterSpace && pos + 1 < outCap) out[pos++] = ' ';
+    for (const char* s = code; *s && pos + 1 < outCap; s++) out[pos++] = *s;
+    needLetterSpace = true;
+  }
+  out[pos < outCap ? pos : outCap - 1] = 0;
+}
+
+// Word-wraps `text` (breaking on spaces where possible) into up to
+// maxLines centered lines, maxCharsPerLine wide, starting at yStart and
+// stepping by lineH. Anything past maxLines is simply not shown - fine
+// for a nice-to-have readout, the actual flash timing doesn't depend on it.
+static void drawWrappedCenter(TFT_eSPI& tft, const char* text, int16_t cx, int16_t yStart,
+                               int16_t lineH, uint8_t font, uint16_t color,
+                               uint8_t maxLines, uint8_t maxCharsPerLine) {
+  size_t len = strlen(text);
+  size_t pos = 0;
+  for (uint8_t line = 0; line < maxLines && pos < len; line++) {
+    size_t remaining = len - pos;
+    size_t take = remaining < maxCharsPerLine ? remaining : maxCharsPerLine;
+    size_t breakAt = take;
+    if (pos + take < len) {
+      size_t i = take;
+      while (i > 0 && text[pos + i - 1] != ' ') i--;
+      if (i > 0) breakAt = i;
+    }
+    char buf[64];
+    size_t n = breakAt < sizeof(buf) - 1 ? breakAt : sizeof(buf) - 1;
+    memcpy(buf, text + pos, n);
+    buf[n] = 0;
+    UI::centerText(tft, buf, cx, yStart + line * lineH, font, color);
+    pos += breakAt;
+    while (pos < len && text[pos] == ' ') pos++;
+  }
+}
+
 void MorseBeaconApp::onEnter(TFT_eSPI& tft) {
   _mode = EDIT;
   _dirty = true;
 }
 
 UI::Rect MorseBeaconApp::keyRect(uint8_t row, uint8_t col, uint8_t rowLen) const {
-  int16_t top = Cfg::STATUS_BAR_H + 30;
+  int16_t top = Cfg::STATUS_BAR_H + 40; // +10 over the text field for the dot/dash preview line
   int16_t rowH = 26;
   int16_t keyW = Cfg::SCREEN_W / rowLen;
   return {(int16_t)(col * keyW + 1), (int16_t)(top + row * rowH), (int16_t)(keyW - 2), (int16_t)(rowH - 4)};
@@ -87,6 +138,16 @@ void MorseBeaconApp::drawEdit(TFT_eSPI& tft) {
   tft.drawString(_len ? shown : "type a message to flash...", 10, Cfg::STATUS_BAR_H + 14, 2);
   tft.setTextDatum(TL_DATUM);
 
+  // Live dot/dash preview of what Send will actually flash.
+  char morse[256];
+  buildMorseText(_text, morse, sizeof(morse));
+  size_t morseLen = strlen(morse);
+  const char* morseShown = morseLen > 50 ? morse + (morseLen - 50) : morse;
+  tft.setTextColor(_len ? Theme::ACCENT : Theme::MUTED, Theme::BG);
+  tft.setTextDatum(ML_DATUM);
+  tft.drawString(_len ? morseShown : "morse code appears here...", 8, Cfg::STATUS_BAR_H + 33, 1);
+  tft.setTextDatum(TL_DATUM);
+
   for (uint8_t r = 0; r < NUM_ROWS; r++) {
     uint8_t len = strlen(_rows[r]);
     for (uint8_t c = 0; c < len; c++) {
@@ -100,7 +161,7 @@ void MorseBeaconApp::drawEdit(TFT_eSPI& tft) {
     }
   }
 
-  int16_t ctrlY = Cfg::STATUS_BAR_H + 30 + NUM_ROWS * 26 + 4;
+  int16_t ctrlY = Cfg::STATUS_BAR_H + 40 + NUM_ROWS * 26 + 4;
   _spaceBtn.r.y = ctrlY;
   _delBtn.r.y = ctrlY;
   _clrBtn.r.y = ctrlY;
@@ -119,7 +180,13 @@ void MorseBeaconApp::drawEdit(TFT_eSPI& tft) {
 void MorseBeaconApp::drawSending(TFT_eSPI& tft) {
   uint16_t fill = _isOn ? Theme::TEXT : Theme::BG;
   tft.fillRect(0, Cfg::STATUS_BAR_H, Cfg::SCREEN_W, Cfg::SCREEN_H - Cfg::STATUS_BAR_H, fill);
-  UI::centerText(tft, _text, Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 30, 2, _isOn ? Theme::BG : Theme::MUTED);
+  uint16_t fg = _isOn ? Theme::BG : Theme::MUTED;
+  UI::centerText(tft, _text, Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 26, 2, fg);
+
+  char morse[256];
+  buildMorseText(_text, morse, sizeof(morse));
+  drawWrappedCenter(tft, morse, Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 54, 18, 2, fg, 5, 20);
+
   _stopBtn.draw(tft);
 }
 
