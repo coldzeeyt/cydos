@@ -31,7 +31,7 @@ GENERATED_APPS_DIR = ROOT / "src" / "apps" / "community"
 REGISTRATION_INC = ROOT / "src" / "community_registration.inc"
 STORE_JSON = ROOT / "docs" / "store.json"
 
-MAX_COMMUNITY_APPS = 8  # keep real headroom under AppManager::MAX_APPS (24)
+MAX_COMMUNITY_APPS = 8  # keep real headroom under AppManager::MAX_APPS (32); also matches CommunityStoreApp::MAX_TILES
 SLUG_RE = re.compile(r"^[a-z0-9_][a-z0-9_-]*$")  # leading "_" marks a template, e.g. "_example"
 IDENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 REQUIRED_STR_FIELDS = ["name", "author", "description", "icon", "class", "header"]
@@ -135,7 +135,7 @@ def main():
             "{{\n"
             "  static {cls} communityApp{i};\n"
             "  uint8_t communityIdx{i} = appManager.registerApp(&communityApp{i});\n"
-            "  homeApp.addTile(UI::iconPuzzle, communityIdx{i});\n"
+            "  communityStoreApp.addTile(UI::iconPuzzle, communityIdx{i});\n"
             "}}".format(cls=app["class"], i=i)
         )
 

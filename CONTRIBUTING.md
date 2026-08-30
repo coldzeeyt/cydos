@@ -163,7 +163,9 @@ letters, digits, `-`/`_` only) containing:
   - `sources` lists every file to copy into the build (header first,
     plus a `.cpp` if you have one); `header` must be one of them.
   - `icon` is shown on the store page only - the device can't render
-    emoji, so your Home-screen tile uses a generic icon instead.
+    emoji, so your tile inside the on-device **App Store** app (see
+    `src/apps/CommunityStoreApp.h`) uses a generic icon instead. Community
+    Edition apps land there together, not as separate Home tiles.
   - `repo` is optional but recommended - link wherever you'll keep the
     app updated.
 

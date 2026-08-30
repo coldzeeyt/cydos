@@ -1,5 +1,11 @@
 [
   {
+    "name": "Launcher Glow",
+    "author": "davidnilssavage",
+    "description": "An original dark launcher wallpaper with a faint circuit-board grid and soft glowing app-tile motifs in CydOs's own cyan, amber and green accent colors.",
+    "image": "wallpapers/launcher-glow.png"
+  },
+  {
     "name": "Solar Flare",
     "author": "davidnilssavage",
     "description": "A warm amber-to-red launcher wallpaper with the same faint circuit grid and app-tile motifs as Launcher Glow, in a hotter palette.",
