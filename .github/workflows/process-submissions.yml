@@ -86,12 +86,25 @@ jobs:
         run: |
           set -e
           BRANCH="submission/${KIND}-${SLUG}-${ISSUE_NUMBER}"
+
+          # A prior run for this same issue may have already opened (and
+          # left open) a PR from this exact branch - don't open a duplicate.
+          EXISTING_PR=$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number' || true)
+          if [ -n "$EXISTING_PR" ]; then
+            echo "PR #$EXISTING_PR already open for $BRANCH, nothing to do."
+            exit 0
+          fi
+
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git checkout -b "$BRANCH"
           git add -A -- docs/wallpapers docs/wallpapers.json community-apps
           git commit -m "Add ${KIND} submission: ${NAME}"
-          git push -u origin "$BRANCH"
+          # This branch only ever holds one bot-generated commit for one
+          # issue - force-pushing it is safe and lets a retry (e.g. after
+          # fixing the "Actions can create PRs" repo setting) overwrite a
+          # previous failed attempt's branch instead of erroring on it.
+          git push -u origin "$BRANCH" --force
           gh pr create --title "Add ${KIND} submission: ${NAME}" \
             --body "Auto-generated from #${ISSUE_NUMBER}. **Review before merging** - nothing has been checked for appropriateness or correctness beyond \"the form fields parsed.\" Closes #${ISSUE_NUMBER} on merge." \
             --base main --head "$BRANCH"
