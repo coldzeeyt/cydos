@@ -338,6 +338,18 @@
     ctx.beginPath(); ctx.moveTo(cx - 4, cy - 14); ctx.lineTo(cx + 14, cy - 17); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx - 4, cy - 9); ctx.lineTo(cx + 14, cy - 12); ctx.stroke();
   }
+  function iconFolder(cx, cy, c) {
+    ctx.fillStyle = c; ctx.fillRect(cx - 15, cy - 8, 12, 6);
+    ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.strokeRect(cx - 15, cy - 4, 30, 18);
+  }
+  function iconDiag(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.strokeRect(cx - 15, cy - 12, 30, 20);
+    ctx.fillStyle = c; ctx.fillRect(cx - 11, cy - 8, 8, 8);
+    ctx.strokeRect(cx + 1, cy - 8, 8, 8);
+    ctx.beginPath(); ctx.moveTo(cx, cy + 8); ctx.lineTo(cx, cy + 12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 6, cy + 12); ctx.lineTo(cx + 6, cy + 12); ctx.stroke();
+  }
 
   // ---------- shared state ----------
   const S = {
@@ -363,9 +375,12 @@
     browserLines: [], browserScroll: 0, browserLinesVisible: 0,
     homePage: 0, homeDragStartX: 0, homeDragStartY: 0, homeDragOffsetX: 0, homeIsSwipe: false, homeDragging: false,
     obsMode: 'hostEdit', obsHost: '', obsScenes: [], obsFeedbackIdx: -1, obsFeedbackOk: true, obsFeedbackUntil: 0, obsHelpReturnTo: 'hostEdit',
-    spotifyMode: 'hostEdit', spotifyHost: '', spotifyHasTrack: false, spotifyPlaying: false,
+    spotifyMode: 'hostEdit', spotifyHost: '', spotifyHasTrack: false, spotifyPlaying: false, spotifyHelpReturnTo: 'hostEdit',
     spotifyTrack: '', spotifyArtist: '', spotifyAlbum: '', spotifyProgress: 0, spotifyDuration: 0,
     lockEnabled: false, locked: false, lastTapAt: 0,
+    filesPath: '/', filesPage: 0, filesSelected: -1, filesMode: 'browse', filesStatus: '', filesStatusUntil: 0,
+    diagTab: 'display', diagPattern: 0, diagTouchX: -1, diagTouchY: -1,
+    devMode: false, activeWallpaper: 'default', wpPreviewId: null,
   };
 
   const TILES = [
@@ -381,12 +396,22 @@
     { id: 'obs', name: 'OBS', icon: iconBroadcast },
     { id: 'spotify', name: 'Spotify', icon: iconMusic },
     { id: 'settings', name: 'Settings', icon: iconGear },
+    { id: 'files', name: 'Files', icon: iconFolder },
+    { id: 'diagnostics', name: 'Diagnostics', icon: iconDiag },
   ];
   const APP_NAMES = {
     home: 'CydOs', wifi: 'WiFi Radar', flash: 'Flashlight', clock: 'Clock',
     qr: 'QR Beamer', dice: 'Dice', calc: 'Calculator', password: 'Password',
     morse: 'Morse', browser: 'Browser', obs: 'OBS', spotify: 'Spotify', settings: 'Settings',
+    files: 'Files', diagnostics: 'Diagnostics',
   };
+
+  // Diagnostics only gets a Home tile with Settings > Dev Mode on - same
+  // as the real firmware (see main.cpp) - so every bit of Home-grid math
+  // reads through this instead of the raw TILES constant.
+  function visibleTiles() {
+    return S.devMode ? TILES : TILES.filter(function (t) { return t.id !== 'diagnostics'; });
+  }
 
   function openApp(id) {
     const leavingFlash = S.current === 'flash' && id !== 'flash';
@@ -402,12 +427,14 @@
     if (id === 'obs') { S.obsMode = S.obsHost ? 'grid' : 'hostEdit'; S.obsFeedbackIdx = -1; }
     if (id === 'spotify') { S.spotifyMode = S.spotifyHost ? 'nowPlaying' : 'hostEdit'; }
     if (id === 'settings') S.settingsMode = 'main';
+    if (id === 'files') { S.filesPath = '/'; S.filesPage = 0; S.filesSelected = -1; S.filesMode = 'browse'; }
+    if (id === 'diagnostics') { S.diagTab = 'display'; S.diagPattern = 0; S.diagTouchX = -1; S.diagTouchY = -1; }
   }
 
   const HOME_COLS = 3, HOME_ROWS = 3, HOME_TILES_PER_PAGE = HOME_COLS * HOME_ROWS;
   const HOME_SWIPE_MOVE_THRESHOLD = 10, HOME_SWIPE_PAGE_THRESHOLD = 50;
 
-  function homePageCount() { return Math.ceil(TILES.length / HOME_TILES_PER_PAGE); }
+  function homePageCount() { return Math.ceil(visibleTiles().length / HOME_TILES_PER_PAGE); }
 
   function homeTileRectInPage(i) {
     const col = i % HOME_COLS, row = Math.floor(i / HOME_COLS);
@@ -418,7 +445,8 @@
   }
 
   function homeTileAt(page, x, y) {
-    const start = page * HOME_TILES_PER_PAGE, end = Math.min(start + HOME_TILES_PER_PAGE, TILES.length);
+    const tiles = visibleTiles();
+    const start = page * HOME_TILES_PER_PAGE, end = Math.min(start + HOME_TILES_PER_PAGE, tiles.length);
     for (let i = start; i < end; i++) {
       const r = homeTileRectInPage(i - start);
       if (x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h) return i;
@@ -431,7 +459,8 @@
     // enough to count as a swipe yet - simple press feedback.
     const pressedIdx = (S.homeDragging && !S.homeIsSwipe) ? homeTileAt(page, S.homeDragStartX, S.homeDragStartY) : -1;
 
-    const start = page * HOME_TILES_PER_PAGE, end = Math.min(start + HOME_TILES_PER_PAGE, TILES.length);
+    const tiles = visibleTiles();
+    const start = page * HOME_TILES_PER_PAGE, end = Math.min(start + HOME_TILES_PER_PAGE, tiles.length);
     for (let i = start; i < end; i++) {
       const cell = homeTileRectInPage(i - start);
       const pressed = i === pressedIdx;
@@ -441,13 +470,37 @@
       ctx.fillStyle = pressed ? Theme.panel2 : Theme.panel; ctx.fill();
       ctx.strokeStyle = pressed ? Theme.accent : Theme.panel2; ctx.lineWidth = 1; ctx.stroke();
       const cx = cardX + cardW / 2, cy = cardY + cardH / 2 - 8;
-      TILES[i].icon(cx, cy, Theme.accent);
-      centerText(TILES[i].name, cx, cardY + cardH - 12, '500 10px "IBM Plex Mono", monospace', Theme.text);
+      tiles[i].icon(cx, cy, Theme.accent);
+      centerText(tiles[i].name, cx, cardY + cardH - 12, '500 10px "IBM Plex Mono", monospace', Theme.text);
     }
   }
 
+  // A couple of stand-in "preinstalled" wallpapers - real ones are BMPs
+  // decoded from the SD card, which a browser tab has no access to, so
+  // these are drawn as flat gradients instead, purely to show the
+  // Settings > Wallpapers picker actually doing something to Home.
+  const WALLPAPERS = [
+    { id: 'default', name: 'Default' },
+    { id: 'aurora', name: 'Aurora', from: '#0b1f3a', to: '#00d9f0' },
+    { id: 'ember', name: 'Ember', from: '#2a0e0e', to: '#ffb020' },
+  ];
+
+  function paintWallpaper(wp) {
+    if (wp && wp.from) {
+      const g = ctx.createLinearGradient(0, STATUS_H, 0, H);
+      g.addColorStop(0, wp.from); g.addColorStop(1, wp.to);
+      ctx.fillStyle = g; ctx.fillRect(0, STATUS_H, W, H - STATUS_H);
+    } else {
+      clearContent();
+    }
+  }
+
+  function drawHomeBackground() {
+    paintWallpaper(WALLPAPERS.find(function (w) { return w.id === S.activeWallpaper; }));
+  }
+
   function drawHome() {
-    clearContent();
+    drawHomeBackground();
     drawHomePage(S.homePage, S.homeDragOffsetX);
 
     const pages = homePageCount();
@@ -484,7 +537,7 @@
           S.homeDragOffsetX = 0;
         } else {
           const idx = homeTileAt(S.homePage, S.homeDragStartX, S.homeDragStartY);
-          if (idx >= 0) openApp(TILES[idx].id);
+          if (idx >= 0) openApp(visibleTiles()[idx].id);
         }
       });
   }
@@ -505,7 +558,7 @@
     ctx.fillStyle = Theme.text;
     ctx.font = '500 12px "IBM Plex Mono", monospace';
     ctx.textAlign = 'left';
-    ctx.fillText(APP_NAMES[S.current], titleX, STATUS_H / 2 + 1);
+    ctx.fillText(S.current === 'diagnostics' ? diagTitle() : APP_NAMES[S.current], titleX, STATUS_H / 2 + 1);
 
     if (S.showBattery) {
       const bw2 = 30, bh2 = 14, bx2 = W - bw2 - 10, by2 = (STATUS_H - bh2) / 2;
@@ -1292,14 +1345,37 @@
   // really poll a plain-http:// companion on your LAN, so "Sync" loads a
   // sample track to show what it looks like instead of actually fetching.
   const SPOTIFY_KB_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm', '.:-'];
+  const SPOTIFY_HELP_LINES = [
+    '1. developer.spotify.com/dashboard',
+    '   - create an app (free)',
+    '   - add redirect URI:',
+    '     127.0.0.1:8899/callback',
+    '2. Note its Client ID + Secret',
+    '3. Run once on your PC to log in:',
+    '   python3 cydos_now_playing.py',
+    '   --client-id X --client-secret Y',
+    "4. Get this PC's LAN IP (ipconfig",
+    '   or ifconfig), enter IP:8090 above',
+  ];
+
+  function drawSpotifyHelp() {
+    clearContent();
+    centerText('Spotify Setup', W / 2, STATUS_H + 12, '600 12px "IBM Plex Mono", monospace', Theme.accent);
+    ctx.fillStyle = Theme.text;
+    ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    let y = STATUS_H + 26;
+    for (const line of SPOTIFY_HELP_LINES) { ctx.fillText(line, 8, y); y += 13; }
+    button(4, H - 36, 90, 30, 'Back', { onTap: function () { S.spotifyMode = S.spotifyHelpReturnTo; } });
+  }
 
   function drawSpotifyHostEdit() {
     clearContent();
-    roundRect(4, STATUS_H + 2, W - 8, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    roundRect(4, STATUS_H + 2, W - 8 - 32, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
     ctx.fillStyle = S.spotifyHost ? Theme.text : Theme.muted;
     ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
-    const shown = S.spotifyHost.length > 34 ? S.spotifyHost.slice(-34) : S.spotifyHost;
+    const shown = S.spotifyHost.length > 26 ? S.spotifyHost.slice(-26) : S.spotifyHost;
     ctx.fillText(S.spotifyHost ? shown : 'host:port, e.g. 192.168.1.50:8090', 10, STATUS_H + 15);
+    button(W - 32, STATUS_H + 2, 28, 22, '?', { onTap: function () { S.spotifyHelpReturnTo = 'hostEdit'; S.spotifyMode = 'help'; } });
 
     const top = STATUS_H + 30, rowH = 24;
     SPOTIFY_KB_ROWS.forEach(function (row, r) {
@@ -1332,6 +1408,7 @@
       },
     });
     button(W - 62, STATUS_H + 2, 56, 22, 'Edit', { onTap: function () { S.spotifyMode = 'hostEdit'; } });
+    button(W - 148, STATUS_H + 2, 26, 22, '?', { onTap: function () { S.spotifyHelpReturnTo = 'nowPlaying'; S.spotifyMode = 'help'; } });
 
     const midY = STATUS_H + 100;
     if (!S.spotifyHasTrack) {
@@ -1356,7 +1433,240 @@
   }
 
   function drawSpotify() {
+    if (S.spotifyMode === 'help') return drawSpotifyHelp();
     S.spotifyMode === 'hostEdit' ? drawSpotifyHostEdit() : drawSpotifyNowPlaying();
+  }
+
+  // ---------- Files ----------
+  // A browser tab has no real SD card to read, so this browses a small
+  // fake in-memory filesystem instead - deleting something here really
+  // does remove it from this session's mock FS, same interaction as the
+  // real firmware, just without real storage behind it.
+  let FILES_FS = {
+    '/': [
+      { name: 'cydos_apps', isDir: true },
+      { name: 'cydos_wallpapers', isDir: true },
+      { name: 'cydos_wallpaper.bmp', isDir: false, size: 205494 },
+    ],
+    '/cydos_apps': [
+      { name: 'todo.cydapp', isDir: false, size: 96 },
+      { name: 'reminder.cydapp', isDir: false, size: 142 },
+    ],
+    '/cydos_wallpapers': [
+      { name: 'aurora.bmp', isDir: false, size: 205494 },
+      { name: 'ember.bmp', isDir: false, size: 205494 },
+    ],
+  };
+  const FILES_ROWS_PER_PAGE = 6;
+
+  function filesEntries() { return FILES_FS[S.filesPath] || []; }
+  function filesPageCount() { const n = filesEntries().length; return n === 0 ? 0 : Math.ceil(n / FILES_ROWS_PER_PAGE); }
+  function filesRowRect(i) { return { x: 4, y: STATUS_H + 24 + i * 26, w: W - 8, h: 24 }; }
+  function filesJoin(dir, name) { return dir === '/' ? '/' + name : dir + '/' + name; }
+
+  function filesGoUp() {
+    if (S.filesPath === '/') return;
+    const idx = S.filesPath.lastIndexOf('/');
+    S.filesPath = idx <= 0 ? '/' : S.filesPath.slice(0, idx);
+    S.filesPage = 0; S.filesSelected = -1;
+  }
+
+  function filesEnter(name) {
+    S.filesPath = filesJoin(S.filesPath, name);
+    S.filesPage = 0; S.filesSelected = -1;
+  }
+
+  function filesSetStatus(msg) {
+    S.filesStatus = msg;
+    S.filesStatusUntil = performance.now() + 2000;
+  }
+
+  function fmtSize(n) {
+    if (n < 1024) return n + 'B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + 'KB';
+    return (n / (1024 * 1024)).toFixed(1) + 'MB';
+  }
+
+  function drawFilesBrowse() {
+    clearContent();
+    const entries = filesEntries();
+    const status = (S.filesStatus && performance.now() < S.filesStatusUntil) ? S.filesStatus : S.filesPath;
+    ctx.fillStyle = Theme.muted; ctx.font = '500 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    ctx.fillText(status, 8, STATUS_H + 13);
+    const pc = filesPageCount();
+    ctx.textAlign = 'right';
+    ctx.fillText((pc ? S.filesPage + 1 : 0) + '/' + pc, W - 6, STATUS_H + 13);
+    ctx.textAlign = 'left';
+
+    if (entries.length === 0) centerText('(empty)', W / 2, 120, '500 11px "IBM Plex Mono", monospace', Theme.muted);
+
+    const base = S.filesPage * FILES_ROWS_PER_PAGE;
+    for (let i = 0; i < FILES_ROWS_PER_PAGE; i++) {
+      const idx = base + i;
+      if (idx >= entries.length) break;
+      const e = entries[idx];
+      const r = filesRowRect(i);
+      const sel = S.filesSelected === idx;
+      roundRect(r.x, r.y, r.w, r.h, 4);
+      ctx.fillStyle = sel ? Theme.accent : Theme.panel; ctx.fill();
+      ctx.fillStyle = sel ? Theme.bg : (e.isDir ? Theme.amber : Theme.text);
+      ctx.font = '600 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+      ctx.fillText((e.isDir ? '> ' : '  ') + e.name, r.x + 8, r.y + r.h / 2 + 1);
+      if (!e.isDir) {
+        ctx.fillStyle = sel ? Theme.bg : Theme.muted;
+        ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'right';
+        ctx.fillText(fmtSize(e.size), r.x + r.w - 8, r.y + r.h / 2 + 1);
+      }
+      ctx.textAlign = 'left';
+      registerHit(r.x, r.y, r.w, r.h, function () {
+        if (e.isDir) filesEnter(e.name);
+        else S.filesSelected = (S.filesSelected === idx) ? -1 : idx;
+      });
+    }
+
+    const barY = STATUS_H + 180;
+    button(6, barY, 60, 30, 'Up', { onTap: filesGoUp });
+    button(72, barY, 50, 30, '<', { onTap: function () { if (S.filesPage > 0) { S.filesPage--; S.filesSelected = -1; } } });
+    button(128, barY, 50, 30, '>', { onTap: function () { if (S.filesPage + 1 < filesPageCount()) { S.filesPage++; S.filesSelected = -1; } } });
+    button(184, barY, 130, 30, 'Delete', {
+      color: S.filesSelected >= 0 ? Theme.accent : Theme.panel,
+      textColor: S.filesSelected >= 0 ? Theme.bg : Theme.text,
+      onTap: function () { if (S.filesSelected >= 0) S.filesMode = 'confirmDelete'; },
+    });
+  }
+
+  function drawFilesConfirm() {
+    clearContent();
+    const e = filesEntries()[S.filesSelected];
+    centerText('Delete "' + e.name + '"?', W / 2, 100, '600 13px "IBM Plex Mono", monospace', Theme.text);
+    centerText(e.isDir ? '(must be empty)' : "This can't be undone.", W / 2, 122, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    button(60, 130, 90, 34, 'Delete', {
+      color: Theme.danger,
+      onTap: function () {
+        const entries = filesEntries();
+        const e2 = entries[S.filesSelected];
+        const ok = !e2.isDir || (FILES_FS[filesJoin(S.filesPath, e2.name)] || []).length === 0;
+        if (ok) {
+          entries.splice(S.filesSelected, 1);
+          delete FILES_FS[filesJoin(S.filesPath, e2.name)];
+        }
+        S.filesSelected = -1; S.filesMode = 'browse'; S.filesPage = 0;
+        filesSetStatus(ok ? 'Deleted.' : 'Folder not empty.');
+      },
+    });
+    button(170, 130, 90, 34, 'Cancel', { onTap: function () { S.filesMode = 'browse'; } });
+  }
+
+  function drawFiles() {
+    S.filesMode === 'confirmDelete' ? drawFilesConfirm() : drawFilesBrowse();
+  }
+
+  // ---------- Diagnostics (Dev Mode only) ----------
+  const DIAG_TABS = ['display', 'touch', 'info'];
+  const DIAG_TAB_LABELS = { display: 'Display', touch: 'Touch', info: 'Info' };
+  const DIAG_PATTERNS = ['Red', 'Green', 'Blue', 'White', 'Black', 'Checkerboard', 'Gray Gradient', 'RGB Gradient'];
+
+  function diagTabRect(i) {
+    const y = STATUS_H + 2, h = 20;
+    if (i === 0) return { x: 2, y, w: 102, h };
+    if (i === 1) return { x: 108, y, w: 102, h };
+    return { x: 214, y, w: 104, h };
+  }
+
+  function diagTitle() {
+    if (S.diagTab === 'display') return DIAG_PATTERNS[S.diagPattern] + ' (' + (S.diagPattern + 1) + '/' + DIAG_PATTERNS.length + ')';
+    return 'Diagnostics';
+  }
+
+  function drawDiagTabBar() {
+    DIAG_TABS.forEach(function (tab, i) {
+      const r = diagTabRect(i);
+      const sel = S.diagTab === tab;
+      roundRect(r.x, r.y, r.w, r.h, 4);
+      ctx.fillStyle = sel ? Theme.accent : Theme.panel; ctx.fill();
+      ctx.fillStyle = sel ? Theme.bg : Theme.text;
+      ctx.font = '600 10px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillText(DIAG_TAB_LABELS[tab], r.x + r.w / 2, r.y + r.h / 2 + 1);
+      ctx.textAlign = 'left';
+      registerHit(r.x, r.y, r.w, r.h, function () {
+        S.diagTab = tab;
+        if (tab === 'touch') { S.diagTouchX = -1; S.diagTouchY = -1; }
+      });
+    });
+  }
+
+  function drawDiagDisplay() {
+    const y0 = STATUS_H + 24, h = H - y0;
+    const p = S.diagPattern;
+    function solid(color) { ctx.fillStyle = color; ctx.fillRect(0, y0, W, h); }
+    if (p === 0) solid('#ff0000');
+    else if (p === 1) solid('#00ff00');
+    else if (p === 2) solid('#0000ff');
+    else if (p === 3) solid('#ffffff');
+    else if (p === 4) solid('#000000');
+    else if (p === 5) {
+      const cell = 8;
+      for (let y = 0; y < h; y += cell) {
+        for (let x = 0; x < W; x += cell) {
+          const on = ((Math.floor(x / cell) + Math.floor(y / cell)) % 2) === 0;
+          ctx.fillStyle = on ? '#ffffff' : '#000000';
+          ctx.fillRect(x, y0 + y, cell, Math.min(cell, h - y));
+        }
+      }
+    } else if (p === 6) {
+      for (let x = 0; x < W; x++) {
+        const v = Math.round((x * 255) / (W - 1));
+        ctx.fillStyle = 'rgb(' + v + ',' + v + ',' + v + ')';
+        ctx.fillRect(x, y0, 1, h);
+      }
+    } else {
+      const third = Math.floor(W / 3);
+      for (let x = 0; x < W; x++) {
+        const v = Math.round(((x % third) * 255) / (third - 1));
+        const color = x < third ? 'rgb(' + v + ',0,0)' : x < 2 * third ? 'rgb(0,' + v + ',0)' : 'rgb(0,0,' + v + ')';
+        ctx.fillStyle = color;
+        ctx.fillRect(x, y0, 1, h);
+      }
+    }
+    registerHit(0, y0, W, h, function () { S.diagPattern = (S.diagPattern + 1) % DIAG_PATTERNS.length; });
+  }
+
+  function drawDiagTouch() {
+    const y0 = STATUS_H + 24;
+    centerText('Drag your finger around', W / 2, y0 + 16, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    if (S.diagTouchX >= 0) {
+      ctx.strokeStyle = Theme.panel2;
+      ctx.beginPath(); ctx.moveTo(0, S.diagTouchY); ctx.lineTo(W, S.diagTouchY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(S.diagTouchX, y0); ctx.lineTo(S.diagTouchX, H); ctx.stroke();
+      ctx.beginPath(); ctx.arc(S.diagTouchX, S.diagTouchY, 6, 0, Math.PI * 2); ctx.fillStyle = Theme.accent; ctx.fill();
+      centerText(Math.round(S.diagTouchX) + ', ' + Math.round(S.diagTouchY), W / 2, H - 16, '500 10px "IBM Plex Mono", monospace', Theme.text);
+    }
+    registerHit(0, y0, W, H - y0,
+      function (px, py) { S.diagTouchX = px; S.diagTouchY = py; },
+      function (px, py) { S.diagTouchX = px; S.diagTouchY = py; });
+  }
+
+  function drawDiagInfo() {
+    let y = STATUS_H + 34;
+    const lh = 20;
+    ctx.fillStyle = Theme.text; ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    const lines = [
+      'Chip: ESP32 (browser demo)',
+      'Free heap: n/a in a browser tab',
+      'Flash: 4 MB (typical CYD)',
+      'Uptime: ' + fmtHMS(performance.now(), false),
+      'SD card: simulated (see Files)',
+      'Battery: monitor disabled',
+    ];
+    lines.forEach(function (line) { ctx.fillText(line, 12, y); y += lh; });
+  }
+
+  function drawDiagnostics() {
+    clearContent();
+    drawDiagTabBar();
+    if (S.diagTab === 'display') drawDiagDisplay();
+    else if (S.diagTab === 'touch') drawDiagTouch();
+    else drawDiagInfo();
   }
 
   // ---------- Settings ----------
@@ -1380,8 +1690,42 @@
         S.lastTapAt = 0;
       },
     });
+    button(40, 196, 116, 22, 'Wallpapers', { onTap: function () { S.settingsMode = 'wallpapers'; } });
+    button(164, 196, 116, 22, 'Dev Mode: ' + (S.devMode ? 'ON' : 'OFF'), {
+      // Same "next boot on real hardware, immediate here" deal as Lock
+      // Screen above - flips the Diagnostics Home tile on the spot so you
+      // can actually go look at it.
+      onTap: function () { S.devMode = !S.devMode; },
+    });
 
-    centerText('CydOs v1.0 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('CydOs v1.0 (browser demo)', W / 2, H - 6, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+  }
+
+  function wpRowRect(i) { return { x: 6, y: STATUS_H + 40 + i * 26, w: W - 12, h: 22 }; }
+
+  function drawSettingsWallpapers() {
+    clearContent();
+    button(10, STATUS_H + 6, 90, 30, '<- Back', { onTap: function () { S.settingsMode = 'main'; } });
+    centerText('Wallpapers', W / 2, STATUS_H + 20, '600 13px "IBM Plex Mono", monospace', Theme.muted);
+
+    WALLPAPERS.forEach(function (wp, i) {
+      const r = wpRowRect(i);
+      const active = S.activeWallpaper === wp.id;
+      roundRect(r.x, r.y, r.w, r.h, 4);
+      ctx.fillStyle = active ? Theme.accent : Theme.panel; ctx.fill();
+      ctx.fillStyle = active ? Theme.bg : Theme.text;
+      ctx.font = '600 12px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+      ctx.fillText(wp.name, r.x + 10, r.y + r.h / 2 + 1);
+      ctx.textAlign = 'left';
+      registerHit(r.x, r.y, r.w, r.h, function () { S.wpPreviewId = wp.id; S.settingsMode = 'wallpaperPreview'; });
+    });
+  }
+
+  function drawSettingsWallpaperPreview() {
+    const wp = WALLPAPERS.find(function (w) { return w.id === S.wpPreviewId; }) || WALLPAPERS[0];
+    paintWallpaper(wp);
+    button(50, 190, 100, 34, 'Use', { onTap: function () { S.activeWallpaper = wp.id; S.settingsMode = 'wallpapers'; } });
+    button(170, 190, 100, 34, 'Cancel', { onTap: function () { S.settingsMode = 'wallpapers'; } });
   }
 
   function drawSettingsTime() {
@@ -1398,7 +1742,10 @@
   }
 
   function drawSettings() {
-    S.settingsMode === 'time' ? drawSettingsTime() : drawSettingsMain();
+    if (S.settingsMode === 'time') drawSettingsTime();
+    else if (S.settingsMode === 'wallpapers') drawSettingsWallpapers();
+    else if (S.settingsMode === 'wallpaperPreview') drawSettingsWallpaperPreview();
+    else drawSettingsMain();
   }
 
   // ---------- Browser ----------
@@ -1540,6 +1887,7 @@
     home: drawHome, wifi: drawWifi, flash: drawFlash, clock: drawClock,
     qr: drawQr, dice: drawDice, calc: drawCalc, password: drawPassword,
     morse: drawMorse, browser: drawBrowser, obs: drawObs, spotify: drawSpotify, settings: drawSettings,
+    files: drawFiles, diagnostics: drawDiagnostics,
   };
 
   const LOCK_DOUBLE_TAP_WINDOW_MS = 600;

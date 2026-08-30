@@ -198,7 +198,9 @@ leaving), so it doesn't fight the "New Update!" WiFi check-in below.
 Unlike OBS, Spotify has no built-in scripting console to hook into, so
 this is a small **standalone script** you run yourself (once logged in,
 it keeps running in the background) rather than something you load
-inside another app.
+inside another app. The **Spotify** app also has its own **?** help
+button (on both the host-entry screen and the now-playing screen) with
+this same walkthrough, in case you're setting it up away from a computer.
 
 **One-time setup:**
 

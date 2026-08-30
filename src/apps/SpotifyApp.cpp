@@ -149,6 +149,7 @@ void SpotifyApp::drawDisplay(TFT_eSPI& tft) {
   tft.drawString(_hostLen ? shownHost : "no companion host set", 8, Cfg::STATUS_BAR_H + 13, 1);
   tft.setTextDatum(TL_DATUM);
   _editBtn.draw(tft);
+  _helpBtn.draw(tft);
 
   int16_t midY = Cfg::STATUS_BAR_H + 100;
   if (!_hasTrack) {
@@ -175,12 +176,14 @@ void SpotifyApp::drawDisplay(TFT_eSPI& tft) {
 void SpotifyApp::drawHostEdit(TFT_eSPI& tft) {
   UI::clearContent(tft);
 
-  tft.fillRoundRect(4, Cfg::STATUS_BAR_H + 2, Cfg::SCREEN_W - 8, 24, 4, Theme::PANEL);
+  int16_t fieldW = Cfg::SCREEN_W - 8 - 32; // leave room for the "?" help button
+  tft.fillRoundRect(4, Cfg::STATUS_BAR_H + 2, fieldW, 24, 4, Theme::PANEL);
   tft.setTextColor(_hostLen ? Theme::TEXT : Theme::MUTED, Theme::PANEL);
   tft.setTextDatum(ML_DATUM);
-  const char* shown = _hostLen > 34 ? _host + (_hostLen - 34) : _host;
+  const char* shown = _hostLen > 26 ? _host + (_hostLen - 26) : _host;
   tft.drawString(_hostLen ? shown : "host:port, e.g. 192.168.1.50:8090", 10, Cfg::STATUS_BAR_H + 14, 2);
   tft.setTextDatum(TL_DATUM);
+  _helpBtn.draw(tft);
 
   for (uint8_t r = 0; r < KB_ROWS; r++) {
     uint8_t len = strlen(_kbRows[r]);
@@ -204,6 +207,34 @@ void SpotifyApp::drawHostEdit(TFT_eSPI& tft) {
   _kbDoneBtn.draw(tft);
 }
 
+void SpotifyApp::drawHelp(TFT_eSPI& tft) {
+  UI::clearContent(tft);
+
+  UI::centerText(tft, "Spotify Setup", Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 12, 2, Theme::ACCENT);
+
+  static const char* LINES[] = {
+      "1. developer.spotify.com/dashboard",
+      "   - create an app (free)",
+      "   - add redirect URI:",
+      "     127.0.0.1:8899/callback",
+      "2. Note its Client ID + Secret",
+      "3. Run once on your PC to log in:",
+      "   python3 cydos_now_playing.py",
+      "   --client-id X --client-secret Y",
+      "4. Get this PC's LAN IP (ipconfig",
+      "   or ifconfig), enter IP:8090 above",
+  };
+  int16_t y = Cfg::STATUS_BAR_H + 26;
+  tft.setTextColor(Theme::TEXT, Theme::BG);
+  tft.setTextDatum(TL_DATUM);
+  for (const char* line : LINES) {
+    tft.drawString(line, 8, y, 1);
+    y += 13;
+  }
+
+  _helpBackBtn.draw(tft);
+}
+
 void SpotifyApp::draw(TFT_eSPI& tft) {
   if (!_dirty) return;
   _dirty = false;
@@ -212,6 +243,7 @@ void SpotifyApp::draw(TFT_eSPI& tft) {
     case FAILED: drawFailed(tft); break;
     case NOW_PLAYING: drawDisplay(tft); break;
     case HOST_EDIT: drawHostEdit(tft); break;
+    case HELP: drawHelp(tft); break;
   }
 }
 
@@ -223,7 +255,13 @@ void SpotifyApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
     return;
   }
 
+  if (_mode == HELP) {
+    if (_helpBackBtn.hit(x, y)) { _mode = _helpReturnTo; _dirty = true; }
+    return;
+  }
+
   if (_mode == HOST_EDIT) {
+    if (_helpBtn.hit(x, y)) { _helpReturnTo = HOST_EDIT; _mode = HELP; _dirty = true; return; }
     for (uint8_t r = 0; r < KB_ROWS; r++) {
       uint8_t len = strlen(_kbRows[r]);
       for (uint8_t c = 0; c < len; c++) {
@@ -248,4 +286,5 @@ void SpotifyApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
 
   // NOW_PLAYING
   if (_editBtn.hit(x, y)) { _mode = HOST_EDIT; _dirty = true; return; }
+  if (_helpBtn.hit(x, y)) { _helpReturnTo = NOW_PLAYING; _mode = HELP; _dirty = true; return; }
 }

@@ -25,8 +25,9 @@ public:
   void onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) override;
 
 private:
-  enum Mode { CONNECTING, NOW_PLAYING, HOST_EDIT, FAILED };
+  enum Mode { CONNECTING, NOW_PLAYING, HOST_EDIT, HELP, FAILED };
   Mode _mode = CONNECTING;
+  Mode _helpReturnTo = HOST_EDIT;
 
   Preferences* _prefs;
 
@@ -46,8 +47,10 @@ private:
   static constexpr uint32_t POLL_INTERVAL_MS = 3000;
   uint32_t _lastPollAt = 0;
 
-  UI::Button _editBtn{{Cfg::SCREEN_W - 62, Cfg::STATUS_BAR_H + 2, 56, 22}, "Edit"};
+  UI::Button _editBtn{{Cfg::SCREEN_W - 84, Cfg::STATUS_BAR_H + 2, 48, 22}, "Edit"};
+  UI::Button _helpBtn{{Cfg::SCREEN_W - 32, Cfg::STATUS_BAR_H + 2, 28, 22}, "?"};
   UI::Button _retryBtn{{Cfg::SCREEN_W / 2 - 60, Cfg::SCREEN_H / 2 + 20, 120, 34}, "Retry"};
+  UI::Button _helpBackBtn{{4, Cfg::SCREEN_H - 36, 90, 30}, "Back"};
 
   static constexpr uint8_t KB_ROWS = 5;
   const char* _kbRows[KB_ROWS] = {"1234567890", "qwertyuiop", "asdfghjkl", "zxcvbnm", ".:-"};
@@ -64,4 +67,5 @@ private:
   void drawFailed(TFT_eSPI& tft);
   void drawDisplay(TFT_eSPI& tft);
   void drawHostEdit(TFT_eSPI& tft);
+  void drawHelp(TFT_eSPI& tft);
 };
