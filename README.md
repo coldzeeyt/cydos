@@ -19,8 +19,11 @@ same gesture the rest of the launcher uses to tell a tap from a drag.
   a stable blip position; distance from center tracks signal strength, so
   walking toward a stronger signal visibly pulls its blip inward. Tap a
   blip for SSID/RSSI/channel/security details.
-- **Flashlight** — full white or full red screen with a brightness slider
-  that drives the backlight PWM directly.
+- **Flashlight** — full-screen light in white, red, amber, cyan, or green,
+  with a brightness slider that drives the backlight PWM directly. **Sleep**
+  turns the screen black (and the backlight off) to save battery or avoid
+  blinding anyone at night - tap anywhere to wake it back up to whatever
+  color/brightness you had.
 - **Clock** — one app, three tabs: a manually-set clock, a stopwatch, and
   a countdown timer that flashes the screen red/white when it hits zero
   (no speaker to beep with).
@@ -48,6 +51,9 @@ same gesture the rest of the launcher uses to tell a tap from a drag.
   script that runs inside OBS itself (see [OBS scene switcher](#obs-scene-switcher)
   below). Tap a tile to switch scenes live; the grid shows your actual
   scene names once synced.
+- **Spotify** — shows what's currently playing on your account (track,
+  artist, album, a progress bar), via a small companion script on your PC
+  (see [Spotify Now Playing](#spotify-now-playing) below).
 - **Settings** — global brightness (persisted across reboots), a manual
   time set (Clock reads the same clock), a battery-icon show/hide toggle,
   a Lock Screen toggle (see below), WiFi setup (used only for the "New
@@ -171,6 +177,37 @@ No authentication, so only run it on a network you trust — it's meant for
 your own LAN, don't port-forward the port. The CYD only talks to it while
 the OBS app is open (WiFi connects on entering the app, disconnects on
 leaving), so it doesn't fight the "New Update!" WiFi check-in below.
+
+## Spotify Now Playing
+
+Unlike OBS, Spotify has no built-in scripting console to hook into, so
+this is a small **standalone script** you run yourself (once logged in,
+it keeps running in the background) rather than something you load
+inside another app.
+
+**One-time setup:**
+
+1. Create a free app at the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
+   and add `http://127.0.0.1:8899/callback` as a Redirect URI in its
+   settings. Note the app's **Client ID** and **Client Secret**.
+2. Run:
+   ```bash
+   python3 spotify-script/cydos_now_playing.py --client-id YOUR_ID --client-secret YOUR_SECRET
+   ```
+   This opens your browser for a one-time Spotify login/consent, then
+   saves a refresh token next to the script (`cydos_spotify_token.json`)
+   so future runs (`python3 cydos_now_playing.py`, no arguments needed)
+   log in automatically.
+3. Leave it running. It serves `GET /now-playing` on port `8090` by
+   default (`--port` to change it) with the track/artist/album/progress
+   Spotify reports, polled every few seconds.
+4. On the CYD: open the **Spotify** app, tap **Edit**, enter this PC's
+   LAN IP and the port (same "find your PC's IP" steps as OBS, above),
+   **Done**.
+
+No authentication on the local server (same LAN-only assumption as OBS -
+don't port-forward it), and it only uses Python's standard library, no
+`pip install` needed.
 
 ## "New Update!" notifications
 

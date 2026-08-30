@@ -329,12 +329,21 @@
     ctx.beginPath(); ctx.moveTo(cx - 8, cy - 9); ctx.lineTo(cx - 14, cy - 16); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx + 8, cy - 9); ctx.lineTo(cx + 14, cy - 16); ctx.stroke();
   }
+  function iconMusic(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.fillStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx - 9, cy + 10, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx + 9, cy + 7, 5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(cx - 4, cy + 10); ctx.lineTo(cx - 4, cy - 14); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 14, cy + 7); ctx.lineTo(cx + 14, cy - 17); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 4, cy - 14); ctx.lineTo(cx + 14, cy - 17); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 4, cy - 9); ctx.lineTo(cx + 14, cy - 12); ctx.stroke();
+  }
 
   // ---------- shared state ----------
   const S = {
     current: 'home',
     brightness: 80,
-    flashRed: false,
+    flashColorIdx: 0, flashAsleep: false,
     flashBrightness: 100,
     wifi: null,
     clockTab: 'clock',
@@ -354,6 +363,8 @@
     browserLines: [], browserScroll: 0, browserLinesVisible: 0,
     homePage: 0, homeDragStartX: 0, homeDragStartY: 0, homeDragOffsetX: 0, homeIsSwipe: false, homeDragging: false,
     obsMode: 'hostEdit', obsHost: '', obsScenes: [], obsFeedbackIdx: -1, obsFeedbackOk: true, obsFeedbackUntil: 0, obsHelpReturnTo: 'hostEdit',
+    spotifyMode: 'hostEdit', spotifyHost: '', spotifyHasTrack: false, spotifyPlaying: false,
+    spotifyTrack: '', spotifyArtist: '', spotifyAlbum: '', spotifyProgress: 0, spotifyDuration: 0,
     lockEnabled: false, locked: false, lastTapAt: 0,
   };
 
@@ -368,19 +379,20 @@
     { id: 'morse', name: 'Morse', icon: iconMorse },
     { id: 'browser', name: 'Browser', icon: iconGlobe },
     { id: 'obs', name: 'OBS', icon: iconBroadcast },
+    { id: 'spotify', name: 'Spotify', icon: iconMusic },
     { id: 'settings', name: 'Settings', icon: iconGear },
   ];
   const APP_NAMES = {
     home: 'CydOs', wifi: 'WiFi Radar', flash: 'Flashlight', clock: 'Clock',
     qr: 'QR Beamer', dice: 'Dice', calc: 'Calculator', password: 'Password',
-    morse: 'Morse', browser: 'Browser', obs: 'OBS', settings: 'Settings',
+    morse: 'Morse', browser: 'Browser', obs: 'OBS', spotify: 'Spotify', settings: 'Settings',
   };
 
   function openApp(id) {
     const leavingFlash = S.current === 'flash' && id !== 'flash';
     S.current = id;
     if (id === 'wifi') initWifi();
-    if (id === 'flash') { S.flashBrightness = S.brightness; applyBrightness(S.flashBrightness); }
+    if (id === 'flash') { S.flashBrightness = S.brightness; S.flashAsleep = false; applyBrightness(S.flashBrightness); }
     if (leavingFlash) applyBrightness(S.brightness);
     if (id === 'dice') S.diceRolling = false;
     if (id === 'qr') S.qrShowing = false;
@@ -388,6 +400,7 @@
     if (id === 'morse') S.morseSending = false;
     if (id === 'browser') { S.browserMode = 'url'; S.browserLoading = false; }
     if (id === 'obs') { S.obsMode = S.obsHost ? 'grid' : 'hostEdit'; S.obsFeedbackIdx = -1; }
+    if (id === 'spotify') { S.spotifyMode = S.spotifyHost ? 'nowPlaying' : 'hostEdit'; }
     if (id === 'settings') S.settingsMode = 'main';
   }
 
@@ -570,16 +583,47 @@
   }
 
   // ---------- Flashlight ----------
+  // Same reasoning as the firmware: reuse the theme's existing colors
+  // instead of inventing new ones.
+  const FLASH_COLORS = [Theme.text, Theme.danger, Theme.amber, Theme.accent, Theme.good];
+  const FLASH_NAMES = ['White', 'Red', 'Amber', 'Cyan', 'Green'];
+  const FLASH_TEXT_ON = [Theme.bg, Theme.text, Theme.bg, Theme.bg, Theme.bg];
+
+  function flashSwatchRect(i) {
+    const w = 50, gap = 8;
+    const totalW = FLASH_COLORS.length * w + (FLASH_COLORS.length - 1) * gap;
+    const x0 = (W - totalW) / 2;
+    return { x: x0 + i * (w + gap), y: STATUS_H + 52, w, h: 40 };
+  }
+
   function drawFlash() {
-    ctx.fillStyle = S.flashRed ? '#ff0000' : '#ffffff';
+    if (S.flashAsleep) {
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, STATUS_H, W, H - STATUS_H);
+      registerHit(0, STATUS_H, W, H - STATUS_H, function () { S.flashAsleep = false; });
+      return;
+    }
+
+    const fill = FLASH_COLORS[S.flashColorIdx];
+    const textOn = FLASH_TEXT_ON[S.flashColorIdx];
+    ctx.fillStyle = fill;
     ctx.fillRect(0, STATUS_H, W, H - STATUS_H);
 
-    button(W / 2 - 60, STATUS_H + 10, 120, 34, S.flashRed ? 'Switch: WHITE' : 'Switch: RED', {
-      onTap: function () { S.flashRed = !S.flashRed; },
+    button(W / 2 - 50, STATUS_H + 10, 100, 32, 'Sleep', { onTap: function () { S.flashAsleep = true; } });
+
+    FLASH_COLORS.forEach(function (c, i) {
+      const r = flashSwatchRect(i);
+      roundRect(r.x, r.y, r.w, r.h, 6); ctx.fillStyle = c; ctx.fill();
+      ctx.strokeStyle = i === S.flashColorIdx ? Theme.panel2 : FLASH_TEXT_ON[i];
+      ctx.lineWidth = i === S.flashColorIdx ? 2 : 1;
+      ctx.stroke();
+      registerHit(r.x, r.y, r.w, r.h, function () { S.flashColorIdx = i; });
     });
+
+    centerText(FLASH_NAMES[S.flashColorIdx], W / 2, STATUS_H + 52 + 40 + 16, '600 12px "IBM Plex Mono", monospace', textOn);
+
     slider(40, H - 40, W - 80, 30, S.flashBrightness, function (v) { S.flashBrightness = v; applyBrightness(v); });
-    const fg = S.flashRed ? Theme.text : Theme.bg;
-    centerText(S.flashBrightness + '%', W / 2, H - 56, '600 12px "IBM Plex Mono", monospace', fg);
+    centerText(S.flashBrightness + '%', W / 2, H - 56, '600 12px "IBM Plex Mono", monospace', textOn);
   }
 
   // ---------- Clock / Stopwatch / Timer ----------
@@ -1243,6 +1287,78 @@
     else drawObsGrid();
   }
 
+  // ---------- Spotify Now Playing ----------
+  // Same mixed-content reality as OBS/Browser: this https:// page can't
+  // really poll a plain-http:// companion on your LAN, so "Sync" loads a
+  // sample track to show what it looks like instead of actually fetching.
+  const SPOTIFY_KB_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm', '.:-'];
+
+  function drawSpotifyHostEdit() {
+    clearContent();
+    roundRect(4, STATUS_H + 2, W - 8, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = S.spotifyHost ? Theme.text : Theme.muted;
+    ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    const shown = S.spotifyHost.length > 34 ? S.spotifyHost.slice(-34) : S.spotifyHost;
+    ctx.fillText(S.spotifyHost ? shown : 'host:port, e.g. 192.168.1.50:8090', 10, STATUS_H + 15);
+
+    const top = STATUS_H + 30, rowH = 24;
+    SPOTIFY_KB_ROWS.forEach(function (row, r) {
+      const keyW = W / row.length;
+      for (let c = 0; c < row.length; c++) {
+        const x = c * keyW + 1, y = top + r * rowH;
+        const ch = row[c];
+        button(x, y, keyW - 2, rowH - 4, ch, {
+          onTap: function () { if (S.spotifyHost.length < 64) S.spotifyHost += ch; },
+        });
+      }
+    });
+
+    const ctrlY = top + SPOTIFY_KB_ROWS.length * rowH + 4;
+    button(4, ctrlY, 100, 26, 'DEL', { onTap: function () { S.spotifyHost = S.spotifyHost.slice(0, -1); } });
+    button(108, ctrlY, 90, 26, 'CLR', { onTap: function () { S.spotifyHost = ''; } });
+    button(202, ctrlY, 114, 26, 'Done', { onTap: function () { S.spotifyMode = 'nowPlaying'; } });
+  }
+
+  function drawSpotifyNowPlaying() {
+    clearContent();
+    ctx.fillStyle = S.spotifyHost ? Theme.muted : Theme.danger;
+    ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    ctx.fillText(S.spotifyHost || 'no companion host set', 8, STATUS_H + 13);
+    button(W - 118, STATUS_H + 2, 52, 22, 'Sync', {
+      onTap: function () {
+        S.spotifyHasTrack = true; S.spotifyPlaying = true;
+        S.spotifyTrack = 'Sample Track'; S.spotifyArtist = 'A Demo Artist';
+        S.spotifyAlbum = 'Demo Album'; S.spotifyProgress = 68000; S.spotifyDuration = 210000;
+      },
+    });
+    button(W - 62, STATUS_H + 2, 56, 22, 'Edit', { onTap: function () { S.spotifyMode = 'hostEdit'; } });
+
+    const midY = STATUS_H + 100;
+    if (!S.spotifyHasTrack) {
+      centerText('Nothing playing', W / 2, midY, '500 12px "IBM Plex Mono", monospace', Theme.muted);
+      return;
+    }
+
+    centerText(S.spotifyTrack, W / 2, midY - 30, '600 13px "IBM Plex Mono", monospace', Theme.text);
+    centerText(S.spotifyArtist, W / 2, midY, '600 12px "IBM Plex Mono", monospace', Theme.accent);
+    centerText(S.spotifyAlbum, W / 2, midY + 24, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+
+    const barY = midY + 46, barX = 40, barW = W - 80;
+    roundRect(barX, barY, barW, 6, 3); ctx.fillStyle = Theme.panel2; ctx.fill();
+    if (S.spotifyDuration > 0) {
+      const fillW = Math.min(barW, barW * S.spotifyProgress / S.spotifyDuration);
+      if (fillW > 0) { roundRect(barX, barY, fillW, 6, 3); ctx.fillStyle = Theme.good; ctx.fill(); }
+    }
+    centerText(S.spotifyPlaying ? 'Playing' : 'Paused', W / 2, barY + 24,
+      '500 10px "IBM Plex Mono", monospace', S.spotifyPlaying ? Theme.good : Theme.muted);
+
+    centerText('DEMO - tap Sync for a sample track', W / 2, H - 6, '400 8px "IBM Plex Mono", monospace', Theme.muted);
+  }
+
+  function drawSpotify() {
+    S.spotifyMode === 'hostEdit' ? drawSpotifyHostEdit() : drawSpotifyNowPlaying();
+  }
+
   // ---------- Settings ----------
   function drawSettingsMain() {
     clearContent();
@@ -1423,7 +1539,7 @@
   const RENDERERS = {
     home: drawHome, wifi: drawWifi, flash: drawFlash, clock: drawClock,
     qr: drawQr, dice: drawDice, calc: drawCalc, password: drawPassword,
-    morse: drawMorse, browser: drawBrowser, obs: drawObs, settings: drawSettings,
+    morse: drawMorse, browser: drawBrowser, obs: drawObs, spotify: drawSpotify, settings: drawSettings,
   };
 
   const LOCK_DOUBLE_TAP_WINDOW_MS = 600;

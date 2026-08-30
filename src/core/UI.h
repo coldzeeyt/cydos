@@ -174,6 +174,14 @@ inline void iconBroadcast(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.drawLine(cx - 8, cy - 9, cx - 14, cy - 16, c);
   tft.drawLine(cx + 8, cy - 9, cx + 14, cy - 16, c);
 }
+inline void iconMusic(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.fillCircle(cx - 9, cy + 10, 5, c);
+  tft.fillCircle(cx + 9, cy + 7, 5, c);
+  tft.drawLine(cx - 4, cy + 10, cx - 4, cy - 14, c);
+  tft.drawLine(cx + 14, cy + 7, cx + 14, cy - 17, c);
+  tft.drawLine(cx - 4, cy - 14, cx + 14, cy - 17, c);
+  tft.drawLine(cx - 4, cy - 9, cx + 14, cy - 12, c);
+}
 
 // Generic tile icon for community-submitted apps - a puzzle piece, since a
 // submitted app brings its own screen but not its own icon-drawing code.
