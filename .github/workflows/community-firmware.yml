@@ -13,11 +13,20 @@ name: Community Edition Firmware
 # is also where a broken community app fails loudly, before anything is
 # ever offered to a real user.
 #
-# On a push to main: build, then commit docs/firmware/CydOsCommunity.bin +
-# docs/store.json + docs/community-manifest.json back to the repo, so the
-# App Store page and its "Install Community Edition" button are always in
-# sync with whatever's currently merged.
-
+# On a push to the default branch: build, then commit
+# docs/firmware/CydOsCommunity.bin + docs/store.json +
+# docs/community-manifest.json back to the repo, so the App Store page
+# and its "Install Community Edition" button are always in sync with
+# whatever's currently merged.
+#
+# NOTE: the `branches:` filter below can't use a runtime expression like
+# ${{ github.event.repository.default_branch }} - GitHub evaluates
+# trigger filters at parse time, not per-run - so it's hardcoded to this
+# repo's actual default branch. This repo has no "main" - if you ever
+# rename/replace the default branch, update this list to match or pushes
+# will silently stop triggering this workflow (exactly what happened
+# before this comment existed: it was hardcoded to "main", which never
+# existed here, so this workflow never once fired on push).
 on:
   pull_request:
     paths:
@@ -25,7 +34,7 @@ on:
       - "scripts/generate_community.py"
       - ".github/workflows/community-firmware.yml"
   push:
-    branches: [main]
+    branches: [claude/cydos-multitool-utilities-j63its]
     paths:
       - "community-apps/**"
       - "scripts/generate_community.py"

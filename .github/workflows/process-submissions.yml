@@ -6,7 +6,7 @@ name: Process App Store Submissions
 # extracts the pasted app.json/code (apps) using
 # scripts/process_submission_issue.py, then opens a PR with the result.
 #
-# Deliberately always a PR, never a direct commit to main - this repo is
+# Deliberately always a PR, never a direct commit to the default branch - this repo is
 # public and anyone can open one of these issues, so a human still has to
 # click Merge before an image or a piece of C++ from a stranger reaches
 # the live site or the Community Edition firmware. That's the same
@@ -105,9 +105,13 @@ jobs:
           # fixing the "Actions can create PRs" repo setting) overwrite a
           # previous failed attempt's branch instead of erroring on it.
           git push -u origin "$BRANCH" --force
+          # Unlike the `branches:` trigger filter in community-firmware.yml
+          # (evaluated at parse time, so it has to be hardcoded), this is a
+          # runtime `run:` step - the default-branch expression works fine
+          # here and stays correct even if the default branch is ever renamed.
           gh pr create --title "Add ${KIND} submission: ${NAME}" \
             --body "Auto-generated from #${ISSUE_NUMBER}. **Review before merging** - nothing has been checked for appropriateness or correctness beyond \"the form fields parsed.\" Closes #${ISSUE_NUMBER} on merge." \
-            --base main --head "$BRANCH"
+            --base "${{ github.event.repository.default_branch }}" --head "$BRANCH"
 
       - name: Comment on failure
         if: failure()
