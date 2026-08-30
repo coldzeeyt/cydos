@@ -140,6 +140,12 @@
   .qcard .qmeta { font-size: 11px; color: var(--muted); letter-spacing: 0.02em; }
   .qcard a.qlink { font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none; }
   .qcard a.qlink:hover { text-decoration: underline; }
+  .qcard a.qanswer {
+    display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
+    font-size: 12.5px; font-weight: 600; text-decoration: none;
+    background: var(--accent); color: var(--accent-ink); padding: 7px 12px; border-radius: 7px;
+  }
+  .qcard a.qanswer:hover { opacity: 0.92; }
 
   .pill {
     flex: none; font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase;
@@ -286,14 +292,25 @@
   }
 
   function renderCards(issues, commentsByIssue) {
-    const cards = issues.map(function (issue) {
+    // Pair each issue with its answer (if any) up front so unanswered ones
+    // can float to the top - whoever's answering (see the notice above)
+    // should see what's waiting before what's already handled.
+    const rows = issues.map(function (issue) {
       const comments = commentsByIssue[issue.number] || [];
       let answer = null;
       for (const c of comments) {
         const kind = classifyComment(c);
         if (kind) { answer = { kind: kind, body: c.body }; break; }
       }
+      return { issue: issue, answer: answer };
+    });
+    rows.sort(function (a, b) {
+      if (!!a.answer !== !!b.answer) return a.answer ? 1 : -1;
+      return new Date(b.issue.created_at) - new Date(a.issue.created_at);
+    });
 
+    const cards = rows.map(function (row) {
+      const issue = row.issue, answer = row.answer;
       const pill = answer
         ? (answer.kind === 'bot' ? '<span class="pill bot">Answered by ClaudeBot</span>' : '<span class="pill owner">Answered</span>')
         : '<span class="pill waiting">Awaiting an answer</span>';
@@ -312,6 +329,14 @@
           ${escapeHtml(answerBody.length > 320 ? answerBody.slice(0, 317) + '...' : answerBody).replace(/\n/g, '<br>')}
         </div>` : '';
 
+      // There's no way to pre-fill a comment on an existing GitHub issue
+      // (unlike opening a new one) - this just gets whoever's answering
+      // straight to the issue's comment box with one click instead of
+      // hunting for it in the repo's issue list.
+      const linkHtml = answer
+        ? `<a class="qlink" href="${issue.html_url}" target="_blank" rel="noopener">View on GitHub &rarr;</a>`
+        : `<a class="qanswer" href="${issue.html_url}" target="_blank" rel="noopener">Answer this &rarr;</a>`;
+
       return `
         <div class="qcard">
           <div class="qtop">
@@ -322,7 +347,7 @@
           ${answerHtml}
           <div class="qtop">
             <span class="qmeta">${new Date(issue.created_at).toLocaleDateString()}</span>
-            <a class="qlink" href="${issue.html_url}" target="_blank" rel="noopener">View on GitHub &rarr;</a>
+            ${linkHtml}
           </div>
         </div>`;
     }).join('');
