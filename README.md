@@ -83,6 +83,14 @@ same gesture the rest of the launcher uses to tell a tap from a drag.
   becomes a real Home tile immediately, no reboot (see the App Store
   section below for how this differs from Community Edition apps, which
   can't work this way).
+- **Notes** — one persistent plain-text note (up to 200 characters), typed
+  on the same on-screen keyboard as OBS/Spotify/WiFi setup and saved
+  across reboots. Not a multi-note app - just a single scratchpad that's
+  always there.
+- **Converter** — unit conversion across three tabs: **Length** (m/ft),
+  **Weight** (kg/lb), and **Temp** (C/F). Type a number on the keypad, read
+  the converted value live above it, **Swap** flips which unit you're
+  typing in.
 
 ## Lock Screen
 

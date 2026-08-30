@@ -1,2 +1,0 @@
-reminder|Reminder|/sdapps/reminder.cydapp
-todo|Todo|/sdapps/todo.cydapp

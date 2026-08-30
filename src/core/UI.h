@@ -208,5 +208,19 @@ inline void iconDiag(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.drawFastVLine(cx, cy + 8, 4, c);
   tft.drawFastHLine(cx - 6, cy + 12, 12, c);
 }
+inline void iconNotes(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.drawRoundRect(cx - 13, cy - 15, 26, 30, 2, c);
+  tft.drawFastHLine(cx - 8, cy - 6, 16, c);
+  tft.drawFastHLine(cx - 8, cy, 16, c);
+  tft.drawFastHLine(cx - 8, cy + 6, 10, c);
+}
+inline void iconConvert(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.drawFastHLine(cx - 14, cy - 6, 22, c);
+  tft.drawLine(cx + 4, cy - 11, cx + 8, cy - 6, c);
+  tft.drawLine(cx + 4, cy - 1, cx + 8, cy - 6, c);
+  tft.drawFastHLine(cx - 8, cy + 6, 22, c);
+  tft.drawLine(cx - 4, cy + 1, cx - 8, cy + 6, c);
+  tft.drawLine(cx - 4, cy + 11, cx - 8, cy + 6, c);
+}
 
 } // namespace UI

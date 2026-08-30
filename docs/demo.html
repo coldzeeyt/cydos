@@ -364,6 +364,22 @@
     ctx.strokeRect(cx - 14, cy - 6, 28, 20);
     ctx.fillStyle = c; ctx.fillRect(cx - 4, cy + 4, 8, 10);
   }
+  function iconNotes(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    roundRect(cx - 13, cy - 15, 26, 30, 2); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 8, cy - 6); ctx.lineTo(cx + 8, cy - 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 8, cy); ctx.lineTo(cx + 8, cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 8, cy + 6); ctx.lineTo(cx + 2, cy + 6); ctx.stroke();
+  }
+  function iconConvert(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - 14, cy - 6); ctx.lineTo(cx + 8, cy - 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 4, cy - 11); ctx.lineTo(cx + 8, cy - 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 4, cy - 1); ctx.lineTo(cx + 8, cy - 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 8, cy + 6); ctx.lineTo(cx + 14, cy + 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 4, cy + 1); ctx.lineTo(cx - 8, cy + 6); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 4, cy + 11); ctx.lineTo(cx - 8, cy + 6); ctx.stroke();
+  }
 
   // ---------- shared state ----------
   const S = {
@@ -399,6 +415,8 @@
     wifiSsid: '', wifiPass: '', settingsWifiField: 'ssid',
     wifiBusy: false, wifiBusyUntil: 0, wifiBusyNext: null,
     obsSyncError: false, spotifySyncError: false, storeDownloadError: null,
+    notesText: '', notesMode: 'view',
+    convertUnit: 'length', convertSwapped: false, convertDisplay: '0', convertFresh: true,
   };
 
   // Fake WiFi, same shape as every real app's actual connect step
@@ -430,6 +448,8 @@
     { id: 'settings', name: 'Settings', icon: iconGear },
     { id: 'files', name: 'Files', icon: iconFolder },
     { id: 'store', name: 'App Store', icon: iconStore },
+    { id: 'notes', name: 'Notes', icon: iconNotes },
+    { id: 'convert', name: 'Converter', icon: iconConvert },
     { id: 'diagnostics', name: 'Diagnostics', icon: iconDiag },
   ];
   const APP_NAMES = {
@@ -437,6 +457,7 @@
     qr: 'QR Beamer', dice: 'Dice', calc: 'Calculator', password: 'Password',
     morse: 'Morse', browser: 'Browser', obs: 'OBS', spotify: 'Spotify', settings: 'Settings',
     files: 'Files', diagnostics: 'Diagnostics', store: 'App Store',
+    notes: 'Notes', convert: 'Converter',
   };
 
   // Diagnostics only gets a Home tile with Settings > Dev Mode on - same
@@ -464,6 +485,8 @@
     if (id === 'settings') S.settingsMode = 'main';
     if (id === 'files') { S.filesPath = '/'; S.filesPage = 0; S.filesSelected = -1; S.filesMode = 'browse'; }
     if (id === 'diagnostics') { S.diagTab = 'display'; S.diagPattern = 0; S.diagTouchX = -1; S.diagTouchY = -1; }
+    if (id === 'notes') S.notesMode = 'view';
+    if (id === 'convert') convertClearEntry();
   }
 
   const HOME_COLS = 3, HOME_ROWS = 3, HOME_TILES_PER_PAGE = HOME_COLS * HOME_ROWS;
@@ -1530,10 +1553,7 @@
       { name: 'cydos_wallpapers', isDir: true },
       { name: 'cydos_wallpaper.bmp', isDir: false, size: 205494 },
     ],
-    '/cydos_apps': [
-      { name: 'todo.cydapp', isDir: false, size: 96 },
-      { name: 'reminder.cydapp', isDir: false, size: 142 },
-    ],
+    '/cydos_apps': [],
     '/cydos_wallpapers': [
       { name: 'aurora.bmp', isDir: false, size: 205494 },
       { name: 'ember.bmp', isDir: false, size: 205494 },
@@ -1823,6 +1843,171 @@
     drawStoreTabBar();
     if (S.storeMode === 'installed') drawStoreInstalled();
     else drawStoreBrowse();
+  }
+
+  // ---------- Notes ----------
+  // A single persistent plain-text note (mirrors NotesApp.cpp) - typed via
+  // the same on-screen keyboard pattern as OBS/Spotify/WiFi setup, wrapped
+  // with the real measured text width (ctx.measureText) rather than a
+  // guessed character count, same reasoning as tft.textWidth() on-device.
+  const NOTES_KB_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm', '.,:-_@!?'];
+  const NOTES_MAX_LEN = 200;
+  const NOTES_FONT = '500 10px "IBM Plex Mono", monospace';
+
+  function notesWrap(text, maxWidth) {
+    ctx.font = NOTES_FONT;
+    const lines = [];
+    let remaining = text;
+    while (remaining.length > 0 && lines.length < 20) {
+      let fit = 0, lastSpace = 0;
+      while (fit < remaining.length) {
+        const probe = remaining.slice(0, fit + 1);
+        if (fit > 0 && ctx.measureText(probe).width > maxWidth) break;
+        if (remaining[fit] === ' ') lastSpace = fit + 1;
+        fit++;
+      }
+      let breakAt = fit;
+      if (fit < remaining.length && lastSpace > 0) breakAt = lastSpace;
+      if (breakAt === 0) breakAt = 1;
+      lines.push(remaining.slice(0, breakAt));
+      remaining = remaining.slice(breakAt).replace(/^ +/, '');
+    }
+    return lines;
+  }
+
+  function drawNotes() {
+    clearContent();
+
+    if (S.notesMode === 'view') {
+      button(W - 70, STATUS_H + 2, 60, 22, 'Edit', { onTap: function () { S.notesMode = 'edit'; } });
+      if (!S.notesText) {
+        centerText('No note yet - tap Edit', W / 2, H / 2, '500 12px "IBM Plex Mono", monospace', Theme.muted);
+        return;
+      }
+      const lines = notesWrap(S.notesText, W - 16);
+      ctx.font = NOTES_FONT; ctx.fillStyle = Theme.text; ctx.textAlign = 'left';
+      let y = STATUS_H + 40;
+      for (const line of lines) {
+        if (y > H - 8) break;
+        ctx.fillText(line, 8, y);
+        y += 14;
+      }
+      return;
+    }
+
+    // edit
+    const fieldW = W - 8;
+    roundRect(4, STATUS_H + 2, fieldW, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = S.notesText ? Theme.text : Theme.muted;
+    ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    const shown = S.notesText.length > 40 ? S.notesText.slice(-40) : S.notesText;
+    ctx.fillText(S.notesText ? shown : 'type your note...', 10, STATUS_H + 15);
+
+    const top = STATUS_H + 30, rowH = 24;
+    NOTES_KB_ROWS.forEach(function (row, r) {
+      const keyW = W / row.length;
+      for (let c = 0; c < row.length; c++) {
+        const x = c * keyW + 1, y = top + r * rowH;
+        const ch = row[c];
+        button(x, y, keyW - 2, rowH - 4, ch, {
+          onTap: function () { if (S.notesText.length < NOTES_MAX_LEN) S.notesText += ch; },
+        });
+      }
+    });
+
+    const ctrlY = top + NOTES_KB_ROWS.length * rowH + 4;
+    button(4, ctrlY, 100, 26, 'SPACE', { onTap: function () { if (S.notesText.length < NOTES_MAX_LEN) S.notesText += ' '; } });
+    button(108, ctrlY, 90, 26, 'DEL', { onTap: function () { S.notesText = S.notesText.slice(0, -1); } });
+    button(202, ctrlY, 54, 26, 'CLR', { onTap: function () { S.notesText = ''; } });
+    button(4, ctrlY + 30, W - 8, 28, 'Done', { onTap: function () { S.notesMode = 'view'; } });
+  }
+
+  // ---------- Unit Converter ----------
+  const CONVERT_KEYS = [
+    ['7', '8', '9'],
+    ['4', '5', '6'],
+    ['1', '2', '3'],
+    ['.', '0', 'DEL'],
+  ];
+  const CONVERT_KEY_W = Math.floor(W / 3);
+  const CONVERT_KEY_TOP = STATUS_H + 110, CONVERT_KEY_H = 24;
+  const CONVERT_UNITS = ['length', 'weight', 'temp'];
+  const CONVERT_TAB_LABELS = { length: 'Length', weight: 'Weight', temp: 'Temp' };
+
+  function convertLabels() {
+    switch (S.convertUnit) {
+      case 'length': return S.convertSwapped ? ['ft', 'm'] : ['m', 'ft'];
+      case 'weight': return S.convertSwapped ? ['lb', 'kg'] : ['kg', 'lb'];
+      default: return S.convertSwapped ? ['F', 'C'] : ['C', 'F'];
+    }
+  }
+  function convertValue(v) {
+    switch (S.convertUnit) {
+      case 'length': return S.convertSwapped ? v / 3.28084 : v * 3.28084;
+      case 'weight': return S.convertSwapped ? v / 2.20462 : v * 2.20462;
+      default: return S.convertSwapped ? (v - 32) * 5 / 9 : v * 9 / 5 + 32;
+    }
+  }
+  function convertClearEntry() { S.convertDisplay = '0'; S.convertFresh = true; }
+  function convertPressDigit(d) {
+    if (S.convertFresh) { S.convertDisplay = d; S.convertFresh = false; }
+    else if (S.convertDisplay.length < 16) S.convertDisplay += d;
+  }
+  function convertPressDot() {
+    if (S.convertFresh) { S.convertDisplay = '0.'; S.convertFresh = false; }
+    else if (S.convertDisplay.indexOf('.') === -1 && S.convertDisplay.length < 16) S.convertDisplay += '.';
+  }
+
+  function drawConvert() {
+    clearContent();
+
+    CONVERT_UNITS.forEach(function (u, i) {
+      const w = i === 2 ? (W - 2 * CONVERT_KEY_W) : CONVERT_KEY_W;
+      const x = i * CONVERT_KEY_W;
+      button(x, STATUS_H + 2, w, 22, CONVERT_TAB_LABELS[u], {
+        active: S.convertUnit === u,
+        onTap: function () { S.convertUnit = u; S.convertSwapped = false; convertClearEntry(); },
+      });
+    });
+
+    const labels = convertLabels();
+    const result = convertValue(parseFloat(S.convertDisplay) || 0);
+
+    roundRect(6, STATUS_H + 28, W - 12, 26, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = Theme.text; ctx.font = '600 13px "IBM Plex Mono", monospace';
+    ctx.textAlign = 'left'; ctx.fillText(labels[0], 12, STATUS_H + 45);
+    ctx.textAlign = 'right'; ctx.fillText(S.convertDisplay, W - 16, STATUS_H + 45);
+
+    roundRect(6, STATUS_H + 58, W - 12, 26, 4); ctx.fillStyle = Theme.panel2; ctx.fill();
+    ctx.fillStyle = Theme.accent;
+    ctx.textAlign = 'left'; ctx.fillText(labels[1], 12, STATUS_H + 75);
+    const resStr = (Math.round(result * 10000) / 10000).toString();
+    ctx.textAlign = 'right'; ctx.fillText(resStr, W - 16, STATUS_H + 75);
+    ctx.textAlign = 'left';
+
+    button(W / 2 - 28, STATUS_H + 86, 56, 20, 'Swap', {
+      onTap: function () { S.convertSwapped = !S.convertSwapped; convertClearEntry(); },
+    });
+
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 3; col++) {
+        const label = CONVERT_KEYS[row][col];
+        const isDel = row === 3 && col === 2;
+        const x = col * CONVERT_KEY_W + 2, y = CONVERT_KEY_TOP + row * CONVERT_KEY_H + 2;
+        const w = CONVERT_KEY_W - 4, h = CONVERT_KEY_H - 4;
+        button(x, y, w, h, label, {
+          color: isDel ? Theme.panel2 : Theme.panel,
+          textColor: isDel ? Theme.danger : Theme.text,
+          onTap: function () {
+            if (label === 'DEL') {
+              S.convertDisplay = S.convertDisplay.length > 1 ? S.convertDisplay.slice(0, -1) : '0';
+              if (S.convertDisplay === '0') S.convertFresh = true;
+            } else if (label === '.') convertPressDot();
+            else convertPressDigit(label);
+          },
+        });
+      }
+    }
   }
 
   // ---------- Diagnostics (Dev Mode only) ----------
@@ -2231,6 +2416,7 @@
     qr: drawQr, dice: drawDice, calc: drawCalc, password: drawPassword,
     morse: drawMorse, browser: drawBrowser, obs: drawObs, spotify: drawSpotify, settings: drawSettings,
     files: drawFiles, diagnostics: drawDiagnostics, store: drawStore,
+    notes: drawNotes, convert: drawConvert,
   };
 
   const LOCK_DOUBLE_TAP_WINDOW_MS = 600;

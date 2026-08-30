@@ -30,6 +30,8 @@
 #include "apps/FileManagerApp.h"
 #include "apps/DiagnosticsApp.h"
 #include "apps/CommunityStoreApp.h"
+#include "apps/NotesApp.h"
+#include "apps/UnitConverterApp.h"
 
 TFT_eSPI tft;
 Touch touch;
@@ -57,6 +59,8 @@ SettingsApp settingsApp(&appManager, &touch, &prefs, &updateChecker, &wallClock,
 FileManagerApp fileManagerApp(&sdCard);
 DiagnosticsApp diagApp(&battery, &sdCard, &touch);
 CommunityStoreApp communityStoreApp(&appManager, &prefs, &sdCard, &sdAppPool);
+NotesApp notesApp(&prefs);
+UnitConverterApp convertApp;
 
 uint8_t g_lastSavedBrightness = 80;
 uint32_t g_lastBrightnessCheck = 0;
@@ -108,6 +112,8 @@ void setup() {
   uint8_t filesIdx = appManager.registerApp(&fileManagerApp);
   uint8_t diagIdx = appManager.registerApp(&diagApp);
   uint8_t storeIdx = appManager.registerApp(&communityStoreApp);
+  uint8_t notesIdx = appManager.registerApp(&notesApp);
+  uint8_t convertIdx = appManager.registerApp(&convertApp);
 
   homeApp.addTile(UI::iconWifi, wifiIdx);
   homeApp.addTile(UI::iconFlash, flashIdx);
@@ -123,6 +129,8 @@ void setup() {
   homeApp.addTile(UI::iconGear, settingsIdx);
   homeApp.addTile(UI::iconFolder, filesIdx);
   homeApp.addTile(UI::iconStore, storeIdx);
+  homeApp.addTile(UI::iconNotes, notesIdx);
+  homeApp.addTile(UI::iconConvert, convertIdx);
   // Diagnostics only gets a Home tile with Settings > Dev Mode on - a
   // full-screen solid-red test pattern isn't something a regular user
   // should be able to stumble into by accident.
