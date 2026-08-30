@@ -54,11 +54,25 @@ same gesture the rest of the launcher uses to tell a tap from a drag.
 - **Spotify** — shows what's currently playing on your account (track,
   artist, album, a progress bar), via a small companion script on your PC
   (see [Spotify Now Playing](#spotify-now-playing) below).
+- **Files** — a plain SD-card file browser. Navigate folders, see file
+  sizes, delete files or empty folders. Read-only beyond delete - no
+  create/rename, since there's no keyboard-free way to name something new
+  that's worth the screen space this device has.
 - **Settings** — global brightness (persisted across reboots), a manual
   time set (Clock reads the same clock), a battery-icon show/hide toggle,
-  a Lock Screen toggle (see below), WiFi setup (used only for the "New
-  Update!" check-in below), and a touch test screen for calibrating the
-  resistive touch panel.
+  a Lock Screen toggle (see below), a **Wallpapers** picker (switch
+  between the SD card's default wallpaper and anything you drop in
+  `/cydos_wallpapers/`, with a live preview before applying), WiFi setup
+  (used only for the "New Update!" check-in below), a touch test screen
+  for calibrating the resistive touch panel, and a **Dev Mode** toggle
+  that reveals the Diagnostics app's Home tile (off by default; takes
+  effect on the next boot).
+- **Diagnostics** *(Dev Mode only)* — a hardware check with three tabs:
+  **Display** (solid red/green/blue/white/black fills, a checkerboard for
+  catching a stuck pixel a solid fill would hide, and grayscale/RGB
+  gradients for spotting color banding - tap anywhere to cycle), **Touch**
+  (a live crosshair under your finger), and **Info** (chip, free memory,
+  uptime, SD card size, battery voltage).
 
 ## Lock Screen
 
@@ -105,10 +119,11 @@ Community Edition reads files straight off the card, no reflash needed.
   card, power-cycle the CYD, and it shows up as a Home tile — up to 6 at
   once. Editing the card takes effect on the next boot, not live.
 - **Wallpapers** — the store page has an in-browser creator: upload any
-  image, it crops to fit, and you download a `cydos_wallpaper.bmp`
-  already in the exact format CydOs reads. Drop it at
-  `/cydos_wallpaper.bmp` on the same card and it becomes Home's
-  background on next boot.
+  image, it crops to fit, and you download a `.bmp` already in the exact
+  format CydOs reads. Drop one at `/cydos_wallpaper.bmp` on the card and
+  it becomes Home's background on next boot - or drop several into
+  `/cydos_wallpapers/` and switch between them any time from
+  **Settings → Wallpapers**, with a live preview before you apply one.
 - **Community Edition** — for real interactive apps (not static
   screens), written in C++ against the same `App` interface the built-in
   apps use. No SD card needed, but it's a full firmware reflash: submit

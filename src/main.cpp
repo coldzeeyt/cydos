@@ -11,6 +11,7 @@
 #include "core/UpdateChecker.h"
 #include "core/WallClock.h"
 #include "core/SdCard.h"
+#include "core/Wallpaper.h"
 
 #include "apps/HomeApp.h"
 #include "apps/WifiRadarApp.h"
@@ -26,6 +27,8 @@
 #include "apps/SpotifyApp.h"
 #include "apps/SettingsApp.h"
 #include "apps/SdCardApp.h"
+#include "apps/FileManagerApp.h"
+#include "apps/DiagnosticsApp.h"
 
 TFT_eSPI tft;
 Touch touch;
@@ -34,6 +37,7 @@ AppManager appManager;
 Preferences prefs;
 UpdateChecker updateChecker;
 WallClock wallClock;
+SdCard sdCard;
 
 HomeApp homeApp(&appManager);
 WifiRadarApp wifiApp;
@@ -47,13 +51,14 @@ MorseBeaconApp morseApp;
 BrowserApp browserApp(&prefs);
 ObsApp obsApp(&prefs);
 SpotifyApp spotifyApp(&prefs);
-SettingsApp settingsApp(&appManager, &touch, &prefs, &updateChecker, &wallClock);
+SettingsApp settingsApp(&appManager, &touch, &prefs, &updateChecker, &wallClock, &sdCard);
+FileManagerApp fileManagerApp(&sdCard);
+DiagnosticsApp diagApp(&battery, &sdCard);
 
 // SD Card Apps: simple no-code screens (see src/apps/SdCardApp.h) loaded
 // from /cydos_apps/*.cydapp at boot. A fixed pool, same reasoning as the
 // community app registration - only slots that actually loaded a file get
 // a Home tile. Editing the SD card takes effect on the next power-on.
-SdCard sdCard;
 static constexpr uint8_t MAX_SD_APPS = 6;
 SdCardApp sdApps[MAX_SD_APPS];
 
@@ -66,6 +71,13 @@ void setup() {
   prefs.begin("cydos", false);
   uint8_t savedBrightness = prefs.getUChar("bright", 80);
   g_lastSavedBrightness = savedBrightness;
+
+  // Settings > Wallpapers picks a file under /cydos_wallpapers/ (or the
+  // legacy default) and persists the choice here; Home reads it back via
+  // Wallpaper::draw() every time it's shown.
+  String savedWallpaper = prefs.getString("wallpaperPath", "/cydos_wallpaper.bmp");
+  Wallpaper::setActivePath(savedWallpaper.c_str());
+  bool devMode = prefs.getBool("devmode", false);
 
   tft.init();
   tft.setRotation(Cfg::SCREEN_ROTATION);
@@ -97,6 +109,8 @@ void setup() {
   uint8_t obsIdx = appManager.registerApp(&obsApp);
   uint8_t spotifyIdx = appManager.registerApp(&spotifyApp);
   uint8_t settingsIdx = appManager.registerApp(&settingsApp);
+  uint8_t filesIdx = appManager.registerApp(&fileManagerApp);
+  uint8_t diagIdx = appManager.registerApp(&diagApp);
 
   homeApp.addTile(UI::iconWifi, wifiIdx);
   homeApp.addTile(UI::iconFlash, flashIdx);
@@ -110,6 +124,11 @@ void setup() {
   homeApp.addTile(UI::iconBroadcast, obsIdx);
   homeApp.addTile(UI::iconMusic, spotifyIdx);
   homeApp.addTile(UI::iconGear, settingsIdx);
+  homeApp.addTile(UI::iconFolder, filesIdx);
+  // Diagnostics only gets a Home tile with Settings > Dev Mode on - a
+  // full-screen solid-red test pattern isn't something a regular user
+  // should be able to stumble into by accident.
+  if (devMode) homeApp.addTile(UI::iconDiag, diagIdx);
 
   // Community apps (see community-apps/ and scripts/generate_community.py):
   // this file is a no-op stub in a normal checkout, so `pio run -e cyd`

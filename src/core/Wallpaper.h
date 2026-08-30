@@ -28,12 +28,31 @@ inline uint32_t readLE32(File& f) {
   return (uint32_t)b0 | ((uint32_t)b1 << 8) | ((uint32_t)b2 << 16) | ((uint32_t)b3 << 24);
 }
 
+// Which file Home (and Settings > Wallpapers' preview) actually draws.
+// Defaults to the single file every existing doc/tool already tells people
+// to copy to the SD card root; Settings > Wallpapers can point this at one
+// of several files under /cydos_wallpapers/ instead - see SettingsApp.
+// A function-local static (not a namespace-scope one) so this stays a
+// single shared instance across every .cpp that includes this header
+// without needing C++17 inline variables.
+inline char* activePathBuf() {
+  static char path[48] = "/cydos_wallpaper.bmp";
+  return path;
+}
+
+inline void setActivePath(const char* path) {
+  char* buf = activePathBuf();
+  strncpy(buf, path, 47);
+  buf[47] = 0;
+}
+inline const char* activePath() { return activePathBuf(); }
+
 // Returns true if it actually drew a wallpaper - callers should fall back
 // to their normal solid background otherwise (missing file, wrong
 // dimensions/format, anything unexpected all just return false, never a
 // crash or a half-drawn screen).
-inline bool draw(TFT_eSPI& tft) {
-  File f = SD.open("/cydos_wallpaper.bmp");
+inline bool drawFrom(TFT_eSPI& tft, const char* path) {
+  File f = SD.open(path);
   if (!f) return false;
 
   const int16_t wantW = Cfg::SCREEN_W;
@@ -67,5 +86,8 @@ inline bool draw(TFT_eSPI& tft) {
   f.close();
   return ok;
 }
+
+// Draws whichever file setActivePath() last pointed at (or the default).
+inline bool draw(TFT_eSPI& tft) { return drawFrom(tft, activePathBuf()); }
 
 } // namespace Wallpaper

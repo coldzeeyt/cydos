@@ -1,13 +1,54 @@
 #include "SettingsApp.h"
 #include "core/AppManager.h"
 #include "core/Display.h"
+#include "core/SdCard.h"
+#include "core/Wallpaper.h"
 #include "Version.h"
+#include <SD.h>
 #include <WiFi.h>
 
 void SettingsApp::onEnter(TFT_eSPI& tft) {
   _mode = MAIN;
   _brightSlider.value = _mgr->brightnessPercent();
+  _devModeEnabled = _prefs->getBool("devmode", false);
   _dirty = true;
+}
+
+void SettingsApp::scanWallpapers() {
+  _wpCount = 0;
+  strncpy(_wpNames[0], "Default", WP_NAME_LEN - 1);
+  _wpNames[0][WP_NAME_LEN - 1] = 0;
+  strncpy(_wpPaths[0], "/cydos_wallpaper.bmp", WP_PATH_LEN - 1);
+  _wpPaths[0][WP_PATH_LEN - 1] = 0;
+  _wpCount = 1;
+
+  if (!_sd || !_sd->available()) return;
+  File dir = SD.open("/cydos_wallpapers");
+  if (!dir || !dir.isDirectory()) {
+    if (dir) dir.close();
+    return;
+  }
+
+  File f = dir.openNextFile();
+  while (f && _wpCount < MAX_WALLPAPERS) {
+    if (!f.isDirectory()) {
+      String fname = f.name();
+      String lower = fname;
+      lower.toLowerCase();
+      if (lower.endsWith(".bmp")) {
+        int slash = fname.lastIndexOf('/');
+        String base = slash >= 0 ? fname.substring(slash + 1) : fname;
+        String path = fname.startsWith("/") ? fname : String("/cydos_wallpapers/") + fname;
+        String display = base.substring(0, base.length() - 4); // strip ".bmp"
+        display.toCharArray(_wpNames[_wpCount], WP_NAME_LEN);
+        path.toCharArray(_wpPaths[_wpCount], WP_PATH_LEN);
+        _wpCount++;
+      }
+    }
+    f.close();
+    f = dir.openNextFile();
+  }
+  dir.close();
 }
 
 void SettingsApp::loadWifiCreds() {
@@ -29,15 +70,52 @@ void SettingsApp::drawMain(TFT_eSPI& tft) {
   _setTimeBtn.draw(tft);
   _wifiBtn.draw(tft);
 
-  _battToggleBtn.label = _mgr->batteryVisible() ? "Battery Icon: ON" : "Battery Icon: OFF";
+  _battToggleBtn.label = _mgr->batteryVisible() ? "Batt: ON" : "Batt: OFF";
   _battToggleBtn.draw(tft);
 
-  _lockToggleBtn.label = _mgr->lockScreenEnabled() ? "Lock Screen: ON" : "Lock Screen: OFF";
+  _lockToggleBtn.label = _mgr->lockScreenEnabled() ? "Lock: ON" : "Lock: OFF";
   _lockToggleBtn.draw(tft);
+
+  _wallpapersBtn.draw(tft);
+
+  _devModeBtn.label = _devModeEnabled ? "Dev: ON" : "Dev: OFF";
+  _devModeBtn.draw(tft);
 
   char verBuf[24];
   snprintf(verBuf, sizeof(verBuf), "CydOs v%s", CYDOS_VERSION);
-  UI::centerText(tft, verBuf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 10, 1, Theme::MUTED);
+  UI::centerText(tft, verBuf, Cfg::SCREEN_W / 2, Cfg::SCREEN_H - 6, 1, Theme::MUTED);
+}
+
+void SettingsApp::drawWallpapers(TFT_eSPI& tft) {
+  UI::clearContent(tft);
+  _backBtn.draw(tft);
+  UI::centerText(tft, "Wallpapers", Cfg::SCREEN_W / 2, Cfg::STATUS_BAR_H + 20, 2, Theme::MUTED);
+
+  if (!_sd || !_sd->available()) {
+    UI::centerText(tft, "No SD card - only Default available", Cfg::SCREEN_W / 2, 120, 1, Theme::MUTED);
+  }
+
+  for (uint8_t i = 0; i < _wpCount; i++) {
+    UI::Rect r = wpRowRect(i);
+    bool isActive = strcmp(_wpPaths[i], Wallpaper::activePath()) == 0;
+    uint16_t bg = isActive ? Theme::ACCENT : Theme::PANEL;
+    tft.fillRoundRect(r.x, r.y, r.w, r.h, 4, bg);
+    tft.setTextColor(isActive ? Theme::BG : Theme::TEXT, bg);
+    tft.setTextDatum(ML_DATUM);
+    tft.drawString(_wpNames[i], r.x + 10, r.y + r.h / 2 + 1, 2);
+    tft.setTextDatum(TL_DATUM);
+  }
+}
+
+void SettingsApp::drawWallpaperPreview(TFT_eSPI& tft) {
+  bool ok = Wallpaper::drawFrom(tft, _wpPaths[_wpPreviewIndex]);
+  if (!ok) {
+    UI::clearContent(tft);
+    UI::centerText(tft, "Couldn't load this wallpaper", Cfg::SCREEN_W / 2, Cfg::SCREEN_H / 2 - 10, 1, Theme::DANGER);
+    UI::centerText(tft, _wpNames[_wpPreviewIndex], Cfg::SCREEN_W / 2, Cfg::SCREEN_H / 2 + 10, 1, Theme::MUTED);
+  }
+  _wpUseBtn.draw(tft);
+  _wpCancelBtn.draw(tft);
 }
 
 void SettingsApp::drawSetTime(TFT_eSPI& tft) {
@@ -182,6 +260,8 @@ void SettingsApp::draw(TFT_eSPI& tft) {
     case WIFI: drawWifi(tft); break;
     case WIFI_KEYBOARD: drawWifiKeyboard(tft); break;
     case SET_TIME: drawSetTime(tft); break;
+    case WALLPAPERS: drawWallpapers(tft); break;
+    case WALLPAPER_PREVIEW: drawWallpaperPreview(tft); break;
   }
 }
 
@@ -265,7 +345,50 @@ void SettingsApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
     return;
   }
 
+  if (_mode == WALLPAPERS) {
+    if (!down) return;
+    if (_backBtn.hit(x, y)) { _mode = MAIN; _dirty = true; return; }
+    for (uint8_t i = 0; i < _wpCount; i++) {
+      if (wpRowRect(i).contains(x, y)) {
+        _wpPreviewIndex = i;
+        _mode = WALLPAPER_PREVIEW;
+        _dirty = true;
+        return;
+      }
+    }
+    return;
+  }
+
+  if (_mode == WALLPAPER_PREVIEW) {
+    if (!down) return;
+    if (_wpUseBtn.hit(x, y)) {
+      Wallpaper::setActivePath(_wpPaths[_wpPreviewIndex]);
+      _prefs->putString("wallpaperPath", _wpPaths[_wpPreviewIndex]);
+      _mode = WALLPAPERS;
+      _dirty = true;
+      return;
+    }
+    if (_wpCancelBtn.hit(x, y)) { _mode = WALLPAPERS; _dirty = true; }
+    return;
+  }
+
   // MAIN
+  if (down && _wallpapersBtn.hit(x, y)) {
+    scanWallpapers();
+    _mode = WALLPAPERS;
+    _dirty = true;
+    return;
+  }
+  if (down && _devModeBtn.hit(x, y)) {
+    // Only gates whether Diagnostics gets a Home tile at boot (see
+    // main.cpp) - same "takes effect on next restart" deal as Lock
+    // Screen, for the same reason (no code here to insert/remove a
+    // live Home tile mid-session).
+    _devModeEnabled = !_devModeEnabled;
+    _prefs->putBool("devmode", _devModeEnabled);
+    _dirty = true;
+    return;
+  }
   if (down && _touchTestBtn.hit(x, y)) {
     _mode = TOUCH_TEST;
     _lastTouchX = _lastTouchY = -1;

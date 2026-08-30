@@ -190,5 +190,16 @@ inline void iconPuzzle(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.drawCircle(cx + 6, cy - 13, 4, c);
   tft.drawCircle(cx - 13, cy + 6, 4, c);
 }
+inline void iconFolder(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.fillRoundRect(cx - 15, cy - 8, 12, 6, 2, c);
+  tft.drawRoundRect(cx - 15, cy - 4, 30, 18, 2, c);
+}
+inline void iconDiag(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.drawRoundRect(cx - 15, cy - 12, 30, 20, 2, c);
+  tft.fillRect(cx - 11, cy - 8, 8, 8, c);
+  tft.drawRect(cx + 1, cy - 8, 8, 8, c);
+  tft.drawFastVLine(cx, cy + 8, 4, c);
+  tft.drawFastHLine(cx - 6, cy + 12, 12, c);
+}
 
 } // namespace UI
