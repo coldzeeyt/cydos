@@ -16,5 +16,11 @@
     "author": "davidiot",
     "description": "A cool indigo-to-teal launcher wallpaper, same circuit-grid and app-tile motif family as Launcher Glow and Solar Flare.",
     "image": "wallpapers/deep-space.png"
+  },
+  {
+    "name": "cyd",
+    "author": "davidiot",
+    "description": "cyd thingy",
+    "image": "wallpapers/cyd.png"
   }
 ]
