@@ -17,6 +17,18 @@ static const char* morseFor(char c) {
   return nullptr;
 }
 
+// Reverse of morseFor(): a dot/dash code back to the letter or digit it
+// represents, '?' if it doesn't match anything (e.g. a mis-keyed code).
+static char decodeSymbols(const char* code) {
+  for (uint8_t i = 0; i < 26; i++) {
+    if (!strcmp(code, LETTER_CODES[i])) return 'a' + i;
+  }
+  for (uint8_t i = 0; i < 10; i++) {
+    if (!strcmp(code, DIGIT_CODES[i])) return '0' + i;
+  }
+  return '?';
+}
+
 // Renders the dot/dash code for a message - letters separated by a space,
 // words by " / " - so you can read the pattern being flashed, not just the
 // plain-text message. `out` should be sized generously: a message full of
@@ -74,8 +86,8 @@ void MorseBeaconApp::onEnter(TFT_eSPI& tft) {
 }
 
 UI::Rect MorseBeaconApp::keyRect(uint8_t row, uint8_t col, uint8_t rowLen) const {
-  int16_t top = Cfg::STATUS_BAR_H + 40; // +10 over the text field for the dot/dash preview line
-  int16_t rowH = 26;
+  int16_t top = CONTENT_TOP + 40; // room for the text field + dot/dash preview line above
+  int16_t rowH = 24;
   int16_t keyW = Cfg::SCREEN_W / rowLen;
   return {(int16_t)(col * keyW + 1), (int16_t)(top + row * rowH), (int16_t)(keyW - 2), (int16_t)(rowH - 4)};
 }
@@ -111,7 +123,7 @@ void MorseBeaconApp::startSend(const char* msg) {
 }
 
 bool MorseBeaconApp::update() {
-  if (_mode != SENDING) return false;
+  if (_tab != TAB_SEND || _mode != SENDING) return false;
   uint32_t elapsed = millis() - _stepStart;
   if (elapsed >= (uint32_t)abs(_steps[_stepIndex])) {
     _stepIndex++;
@@ -127,15 +139,22 @@ bool MorseBeaconApp::update() {
   return _dirty;
 }
 
-void MorseBeaconApp::drawEdit(TFT_eSPI& tft) {
-  UI::clearContent(tft);
+void MorseBeaconApp::drawTabs(TFT_eSPI& tft) {
+  for (uint8_t i = 0; i < TAB_COUNT; i++) {
+    bool active = (i == _tab);
+    _tabBtns[i].color = active ? Theme::ACCENT : Theme::PANEL;
+    _tabBtns[i].textColor = active ? Theme::BG : Theme::MUTED;
+    _tabBtns[i].draw(tft);
+  }
+}
 
-  tft.fillRoundRect(4, Cfg::STATUS_BAR_H + 2, Cfg::SCREEN_W - 8, 24, 4, Theme::PANEL);
+void MorseBeaconApp::drawEdit(TFT_eSPI& tft) {
+  tft.fillRoundRect(4, CONTENT_TOP + 2, Cfg::SCREEN_W - 8, 22, 4, Theme::PANEL);
   const char* shown = _text;
   if (_len > 34) shown = _text + (_len - 34);
   tft.setTextColor(_len ? Theme::TEXT : Theme::MUTED, Theme::PANEL);
   tft.setTextDatum(ML_DATUM);
-  tft.drawString(_len ? shown : "type a message to flash...", 10, Cfg::STATUS_BAR_H + 14, 2);
+  tft.drawString(_len ? shown : "type a message to flash...", 10, CONTENT_TOP + 13, 2);
   tft.setTextDatum(TL_DATUM);
 
   // Live dot/dash preview of what Send will actually flash.
@@ -145,7 +164,7 @@ void MorseBeaconApp::drawEdit(TFT_eSPI& tft) {
   const char* morseShown = morseLen > 50 ? morse + (morseLen - 50) : morse;
   tft.setTextColor(_len ? Theme::ACCENT : Theme::MUTED, Theme::BG);
   tft.setTextDatum(ML_DATUM);
-  tft.drawString(_len ? morseShown : "morse code appears here...", 8, Cfg::STATUS_BAR_H + 33, 1);
+  tft.drawString(_len ? morseShown : "morse code appears here...", 8, CONTENT_TOP + 32, 1);
   tft.setTextDatum(TL_DATUM);
 
   for (uint8_t r = 0; r < NUM_ROWS; r++) {
@@ -161,7 +180,7 @@ void MorseBeaconApp::drawEdit(TFT_eSPI& tft) {
     }
   }
 
-  int16_t ctrlY = Cfg::STATUS_BAR_H + 40 + NUM_ROWS * 26 + 4;
+  int16_t ctrlY = CONTENT_TOP + 40 + NUM_ROWS * 24 + 2;
   _spaceBtn.r.y = ctrlY;
   _delBtn.r.y = ctrlY;
   _clrBtn.r.y = ctrlY;
@@ -171,7 +190,7 @@ void MorseBeaconApp::drawEdit(TFT_eSPI& tft) {
   _clrBtn.draw(tft);
   _sosBtn.draw(tft);
 
-  _sendBtn.r.y = ctrlY + 30;
+  _sendBtn.r.y = ctrlY + 26;
   _sendBtn.color = _len ? Theme::PANEL : Theme::PANEL2;
   _sendBtn.textColor = _len ? Theme::ACCENT : Theme::MUTED;
   _sendBtn.draw(tft);
@@ -190,16 +209,66 @@ void MorseBeaconApp::drawSending(TFT_eSPI& tft) {
   _stopBtn.draw(tft);
 }
 
+void MorseBeaconApp::appendRaw(char c) {
+  if (_rawLen < RAW_MAX) { _rawMorse[_rawLen++] = c; _rawMorse[_rawLen] = 0; }
+}
+
+void MorseBeaconApp::finalizeLetter() {
+  if (_curSymsLen == 0) return;
+  char c = decodeSymbols(_curSymbols);
+  if (_decodedLen < DECODE_MAX_LEN) { _decodedText[_decodedLen++] = c; _decodedText[_decodedLen] = 0; }
+  _curSymsLen = 0;
+  _curSymbols[0] = 0;
+}
+
+void MorseBeaconApp::drawDecode(TFT_eSPI& tft) {
+  tft.fillRoundRect(4, CONTENT_TOP + 2, Cfg::SCREEN_W - 8, 22, 4, Theme::PANEL);
+  const char* shownText = _decodedText;
+  if (_decodedLen > 34) shownText = _decodedText + (_decodedLen - 34);
+  tft.setTextColor(_decodedLen ? Theme::TEXT : Theme::MUTED, Theme::PANEL);
+  tft.setTextDatum(ML_DATUM);
+  tft.drawString(_decodedLen ? shownText : "decoded text appears here...", 10, CONTENT_TOP + 13, 2);
+  tft.setTextDatum(TL_DATUM);
+
+  const char* shownRaw = _rawLen > 50 ? _rawMorse + (_rawLen - 50) : _rawMorse;
+  tft.setTextColor(_rawLen ? Theme::ACCENT : Theme::MUTED, Theme::BG);
+  tft.setTextDatum(ML_DATUM);
+  tft.drawString(_rawLen ? shownRaw : "key in . and - below...", 8, CONTENT_TOP + 32, 1);
+  tft.setTextDatum(TL_DATUM);
+
+  int16_t bigY = CONTENT_TOP + 40;
+  _dotBtn.r.y = bigY;
+  _dashBtn.r.y = bigY;
+  _dotBtn.draw(tft);
+  _dashBtn.draw(tft);
+
+  int16_t ctrlY = bigY + 76 + 4;
+  _gapBtn.r.y = ctrlY;
+  _wordBtn.r.y = ctrlY;
+  _decDelBtn.r.y = ctrlY;
+  _decClrBtn.r.y = ctrlY;
+  _gapBtn.draw(tft);
+  _wordBtn.draw(tft);
+  _decDelBtn.draw(tft);
+  _decClrBtn.draw(tft);
+}
+
 void MorseBeaconApp::draw(TFT_eSPI& tft) {
   if (!_dirty) return;
   _dirty = false;
-  if (_mode == EDIT) drawEdit(tft);
-  else drawSending(tft);
+
+  if (_tab == TAB_SEND && _mode == SENDING) {
+    drawSending(tft);
+    return;
+  }
+
+  UI::clearContent(tft);
+  drawTabs(tft);
+  if (_tab == TAB_SEND) drawEdit(tft);
+  else drawDecode(tft);
 }
 
-void MorseBeaconApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
-  if (!down) return;
-
+void MorseBeaconApp::onTouchSend(int16_t x, int16_t y) {
   if (_mode == SENDING) {
     if (_stopBtn.hit(x, y)) { _mode = EDIT; _dirty = true; }
     return;
@@ -222,4 +291,60 @@ void MorseBeaconApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
   else if (_clrBtn.hit(x, y)) { _len = 0; _text[0] = 0; _dirty = true; }
   else if (_sosBtn.hit(x, y)) { startSend("sos"); }
   else if (_sendBtn.hit(x, y) && _len > 0) { startSend(_text); }
+}
+
+void MorseBeaconApp::onTouchDecode(int16_t x, int16_t y) {
+  if (_dotBtn.hit(x, y)) {
+    if (_curSymsLen < CUR_SYMS_MAX) { _curSymbols[_curSymsLen++] = '.'; _curSymbols[_curSymsLen] = 0; appendRaw('.'); }
+    _dirty = true;
+  } else if (_dashBtn.hit(x, y)) {
+    if (_curSymsLen < CUR_SYMS_MAX) { _curSymbols[_curSymsLen++] = '-'; _curSymbols[_curSymsLen] = 0; appendRaw('-'); }
+    _dirty = true;
+  } else if (_gapBtn.hit(x, y)) {
+    if (_curSymsLen > 0) { finalizeLetter(); appendRaw(' '); _dirty = true; }
+  } else if (_wordBtn.hit(x, y)) {
+    bool hadPending = _curSymsLen > 0;
+    finalizeLetter();
+    if (hadPending) appendRaw(' ');
+    appendRaw('/');
+    appendRaw(' ');
+    if (_decodedLen < DECODE_MAX_LEN) { _decodedText[_decodedLen++] = ' '; _decodedText[_decodedLen] = 0; }
+    _dirty = true;
+  } else if (_decDelBtn.hit(x, y)) {
+    // Only undoes the symbol currently being keyed in - once a letter is
+    // finalized (Gap/Word), Clear is the way to fix a mistake. Keeps the
+    // raw/decoded views always exactly in sync with no reverse-parsing.
+    if (_curSymsLen > 0) {
+      _curSymsLen--;
+      _curSymbols[_curSymsLen] = 0;
+      if (_rawLen > 0) { _rawLen--; _rawMorse[_rawLen] = 0; }
+      _dirty = true;
+    }
+  } else if (_decClrBtn.hit(x, y)) {
+    _curSymsLen = 0; _curSymbols[0] = 0;
+    _decodedLen = 0; _decodedText[0] = 0;
+    _rawLen = 0; _rawMorse[0] = 0;
+    _dirty = true;
+  }
+}
+
+void MorseBeaconApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
+  (void)tft;
+  if (!down) return;
+
+  if (_tab == TAB_SEND && _mode == SENDING) {
+    onTouchSend(x, y);
+    return;
+  }
+
+  for (uint8_t i = 0; i < TAB_COUNT; i++) {
+    if (_tabBtns[i].hit(x, y)) {
+      _tab = (Tab)i;
+      _dirty = true;
+      return;
+    }
+  }
+
+  if (_tab == TAB_SEND) onTouchSend(x, y);
+  else onTouchDecode(x, y);
 }

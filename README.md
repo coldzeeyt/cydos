@@ -32,11 +32,14 @@ same gesture the rest of the launcher uses to tell a tap from a drag.
 - **Password** — generates a random password (configurable length and
   character set) and can beam it as a QR code so you don't have to type
   it in by hand.
-- **Morse** — type a message (or tap the one-button **SOS**) and flash it
-  out in Morse code with the screen - a visual signal for getting
-  someone's attention at a distance. Shows the dot/dash pattern as you
-  type and again while it's flashing, so you can follow along or learn
-  the code, not just read the plain-text message.
+- **Morse** — two tabs. **Send**: type a message (or tap the one-button
+  **SOS**) and flash it out in Morse code with the screen - a visual
+  signal for getting someone's attention at a distance. Shows the
+  dot/dash pattern as you type and again while it's flashing, so you can
+  follow along or learn the code, not just read the plain-text message.
+  **Decode**: the reverse direction - big **DOT**/**DASH** buttons to key
+  in a code by hand, **Gap** to close out a letter, **Word** to close out
+  a word, and the translated text builds up live as you go.
 - **Browser** — a "browser" in the loosest sense: type a URL, it fetches
   the page over WiFi, strips every tag, and shows whatever text is left,
   word-wrapped and scrollable. No CSS, no images, no JS - just enough to

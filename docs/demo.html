@@ -345,6 +345,7 @@
     calcDisplay: '0', calcAcc: 0, calcPendingOp: null, calcFresh: true, calcError: false,
     pwLength: 16, pwUpper: true, pwDigits: true, pwSymbols: false, pwValue: '', pwShowing: false,
     morseText: '', morseSending: false, morseSchedule: [], morseStep: 0, morseStepStart: 0, morseOn: false,
+    morseTab: 'send', decCur: '', decText: '', decRaw: '',
     showBattery: true,
     settingsMode: 'main',
     timerAlarmUntil: 0,
@@ -933,6 +934,16 @@
     return null;
   }
 
+  // Reverse of morseFor(): a dot/dash code back to the letter or digit it
+  // represents, '?' if it doesn't match anything (e.g. a mis-keyed code).
+  function decodeSymbols(code) {
+    let i = MORSE_LETTERS.indexOf(code);
+    if (i >= 0) return String.fromCharCode(97 + i);
+    i = MORSE_DIGITS.indexOf(code);
+    if (i >= 0) return String(i);
+    return '?';
+  }
+
   // Dot/dash rendering of a message - letters separated by a space, words
   // by " / " - so you can read the pattern being flashed, not just the text.
   function buildMorseText(msg) {
@@ -999,21 +1010,34 @@
     }
   }
 
+  const MORSE_CONTENT_TOP = STATUS_H + 22;
+
+  function drawMorseTabs() {
+    button(0, STATUS_H, W / 2, 22, 'Send', {
+      active: S.morseTab === 'send',
+      onTap: function () { S.morseTab = 'send'; },
+    });
+    button(W / 2, STATUS_H, W / 2, 22, 'Decode', {
+      active: S.morseTab === 'decode',
+      onTap: function () { S.morseTab = 'decode'; },
+    });
+  }
+
   function drawMorseEdit() {
-    clearContent();
-    roundRect(4, STATUS_H + 2, W - 8, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    const top0 = MORSE_CONTENT_TOP;
+    roundRect(4, top0 + 2, W - 8, 22, 4); ctx.fillStyle = Theme.panel; ctx.fill();
     const shown = S.morseText.length > 34 ? S.morseText.slice(-34) : S.morseText;
     ctx.fillStyle = S.morseText ? Theme.text : Theme.muted;
     ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
-    ctx.fillText(S.morseText ? shown : 'type a message to flash...', 10, STATUS_H + 15);
+    ctx.fillText(S.morseText ? shown : 'type a message to flash...', 10, top0 + 13);
 
     const morsePreview = buildMorseText(S.morseText);
     const morseShown = morsePreview.length > 50 ? morsePreview.slice(-50) : morsePreview;
     ctx.fillStyle = S.morseText ? Theme.accent : Theme.muted;
     ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
-    ctx.fillText(S.morseText ? morseShown : 'morse code appears here...', 8, STATUS_H + 33);
+    ctx.fillText(S.morseText ? morseShown : 'morse code appears here...', 8, top0 + 32);
 
-    const top = STATUS_H + 40, rowH = 26;
+    const top = top0 + 40, rowH = 24;
     MORSE_ROWS.forEach(function (row, r) {
       const keyW = W / row.length;
       for (let c = 0; c < row.length; c++) {
@@ -1025,12 +1049,12 @@
       }
     });
 
-    const ctrlY = top + MORSE_ROWS.length * rowH + 4;
-    button(4, ctrlY, 90, 26, 'SPACE', { onTap: function () { if (S.morseText.length < 40) S.morseText += ' '; } });
-    button(98, ctrlY, 80, 26, 'DEL', { onTap: function () { S.morseText = S.morseText.slice(0, -1); } });
-    button(182, ctrlY, 60, 26, 'CLR', { onTap: function () { S.morseText = ''; } });
-    button(246, ctrlY, 70, 26, 'SOS', { onTap: function () { startMorseSend('sos'); } });
-    button(4, ctrlY + 30, W - 8, 30, 'Send', {
+    const ctrlY = top + MORSE_ROWS.length * rowH + 2;
+    button(4, ctrlY, 90, 24, 'SPACE', { onTap: function () { if (S.morseText.length < 40) S.morseText += ' '; } });
+    button(98, ctrlY, 80, 24, 'DEL', { onTap: function () { S.morseText = S.morseText.slice(0, -1); } });
+    button(182, ctrlY, 60, 24, 'CLR', { onTap: function () { S.morseText = ''; } });
+    button(246, ctrlY, 70, 24, 'SOS', { onTap: function () { startMorseSend('sos'); } });
+    button(4, ctrlY + 26, W - 8, 24, 'Send', {
       color: S.morseText ? Theme.panel : Theme.panel2,
       textColor: S.morseText ? Theme.accent : Theme.muted,
       onTap: function () { if (S.morseText) startMorseSend(S.morseText); },
@@ -1047,7 +1071,60 @@
     button(W / 2 - 50, H - 44, 100, 32, 'Stop', { onTap: function () { S.morseSending = false; } });
   }
 
-  function drawMorse() { S.morseSending ? drawMorseSending() : drawMorseEdit(); }
+  // Undoes only the symbol currently being keyed in - once a letter is
+  // finalized (Gap/Word), Clear is the way to fix a mistake. Keeps the
+  // raw/decoded views always exactly in sync with no reverse-parsing.
+  function decDot() { S.decCur += '.'; S.decRaw += '.'; }
+  function decDash() { S.decCur += '-'; S.decRaw += '-'; }
+  function decFinalizeLetter() {
+    if (!S.decCur) return;
+    S.decText += decodeSymbols(S.decCur);
+    S.decCur = '';
+  }
+  function decGap() { if (S.decCur) { decFinalizeLetter(); S.decRaw += ' '; } }
+  function decWord() {
+    const hadPending = !!S.decCur;
+    decFinalizeLetter();
+    if (hadPending) S.decRaw += ' ';
+    S.decRaw += '/ ';
+    S.decText += ' ';
+  }
+  function decDel() {
+    if (S.decCur) { S.decCur = S.decCur.slice(0, -1); S.decRaw = S.decRaw.slice(0, -1); }
+  }
+  function decClr() { S.decCur = ''; S.decText = ''; S.decRaw = ''; }
+
+  function drawMorseDecode() {
+    const top0 = MORSE_CONTENT_TOP;
+    roundRect(4, top0 + 2, W - 8, 22, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    const shownText = S.decText.length > 34 ? S.decText.slice(-34) : S.decText;
+    ctx.fillStyle = S.decText ? Theme.text : Theme.muted;
+    ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    ctx.fillText(S.decText ? shownText : 'decoded text appears here...', 10, top0 + 13);
+
+    const shownRaw = S.decRaw.length > 50 ? S.decRaw.slice(-50) : S.decRaw;
+    ctx.fillStyle = S.decRaw ? Theme.accent : Theme.muted;
+    ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    ctx.fillText(S.decRaw ? shownRaw : 'key in . and - below...', 8, top0 + 32);
+
+    const bigY = top0 + 40;
+    button(4, bigY, 150, 76, 'DOT', { onTap: decDot });
+    button(166, bigY, 150, 76, 'DASH', { onTap: decDash });
+
+    const ctrlY = bigY + 76 + 4;
+    button(4, ctrlY, 74, 26, 'Gap', { onTap: decGap });
+    button(82, ctrlY, 74, 26, 'Word', { onTap: decWord });
+    button(160, ctrlY, 74, 26, 'DEL', { onTap: decDel });
+    button(238, ctrlY, 74, 26, 'CLR', { onTap: decClr });
+  }
+
+  function drawMorse() {
+    if (S.morseSending) { drawMorseSending(); return; }
+    clearContent();
+    drawMorseTabs();
+    if (S.morseTab === 'send') drawMorseEdit();
+    else drawMorseDecode();
+  }
 
   // ---------- OBS scene switcher ----------
   // On the real device this fetches ["scene","names",...] from the
@@ -1177,7 +1254,7 @@
       onTap: function () { S.showBattery = !S.showBattery; },
     });
 
-    centerText('CydOs v1.8 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('CydOs v1.0 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
   }
 
   function drawSettingsTime() {
