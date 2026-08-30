@@ -1,0 +1,105 @@
+name: Process App Store Submissions
+
+# Turns a "wallpaper-submission" or "app-submission" issue (opened via the
+# App Store page's generator forms - see docs/store.html) into a pull
+# request automatically: downloads the attached image (wallpapers) or
+# extracts the pasted app.json/code (apps) using
+# scripts/process_submission_issue.py, then opens a PR with the result.
+#
+# Deliberately always a PR, never a direct commit to main - this repo is
+# public and anyone can open one of these issues, so a human still has to
+# click Merge before an image or a piece of C++ from a stranger reaches
+# the live site or the Community Edition firmware. That's the same
+# review gate community-firmware.yml already assumes for Community
+# Edition apps; this just automates everything before that gate instead
+# of a maintainer doing it by hand.
+#
+# Known limitation: PRs opened with the default GITHUB_TOKEN don't
+# trigger other on:pull_request workflows (GitHub's own anti-recursion
+# rule), so community-firmware.yml's build-and-report check won't run
+# automatically on a PR this workflow opens - a maintainer reviewing it
+# should push a small commit (or use a PAT_TOKEN secret here instead, if
+# you set one up) to get that check to fire before merging.
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  process:
+    if: >-
+      contains(github.event.issue.labels.*.name, 'wallpaper-submission') ||
+      contains(github.event.issue.labels.*.name, 'app-submission')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Determine submission kind
+        id: kind
+        env:
+          LABELS: ${{ join(github.event.issue.labels.*.name, ',') }}
+        run: |
+          if [[ ",$LABELS," == *",wallpaper-submission,"* ]]; then
+            echo "kind=wallpaper" >> "$GITHUB_OUTPUT"
+          else
+            echo "kind=app" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Untrusted issue content goes through an env var, never spliced
+      # directly into a run: script - that's the classic GitHub Actions
+      # script-injection hole (a body containing e.g. $(curl ...) would
+      # execute if interpolated straight into the shell).
+      - name: Save issue body
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: printf '%s' "$ISSUE_BODY" > /tmp/issue_body.txt
+
+      - name: Process submission
+        id: process
+        run: |
+          set -e
+          python3 scripts/process_submission_issue.py "${{ steps.kind.outputs.kind }}" \
+            --body-file /tmp/issue_body.txt --out-dir . > /tmp/result.json
+          python3 -c "
+          import json
+          d = json.load(open('/tmp/result.json'))
+          print('slug=' + d['slug'])
+          print('name=' + d['name'])
+          " >> "$GITHUB_OUTPUT"
+
+      - name: Open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          KIND: ${{ steps.kind.outputs.kind }}
+          SLUG: ${{ steps.process.outputs.slug }}
+          NAME: ${{ steps.process.outputs.name }}
+        run: |
+          set -e
+          BRANCH="submission/${KIND}-${SLUG}-${ISSUE_NUMBER}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          git add -A -- docs/wallpapers docs/wallpapers.json community-apps
+          git commit -m "Add ${KIND} submission: ${NAME}"
+          git push -u origin "$BRANCH"
+          gh pr create --title "Add ${KIND} submission: ${NAME}" \
+            --body "Auto-generated from #${ISSUE_NUMBER}. **Review before merging** - nothing has been checked for appropriateness or correctness beyond \"the form fields parsed.\" Closes #${ISSUE_NUMBER} on merge." \
+            --base main --head "$BRANCH"
+
+      - name: Comment on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$ISSUE_NUMBER" --body "Couldn't process this submission automatically - a maintainer will need to look at it by hand. Common causes: no image was attached, or the \`app.json\`/code blocks were edited after the store page generated them."

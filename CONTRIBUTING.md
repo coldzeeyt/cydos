@@ -133,8 +133,11 @@ over `https://` can't reach a plain-`http://` LAN device anyway
 The easiest way is the **[Generate a submission](https://coldzeeyt.github.io/cydos/store.html)**
 form on the store page itself: fill in the name/author/icon/description,
 upload your app's header file, and it opens a pre-filled GitHub issue for
-you - no git required. A maintainer turns that into the PR described
-below.
+you - no git required. `.github/workflows/process-submissions.yml` then
+picks up that issue automatically (via
+`scripts/process_submission_issue.py`) and opens the PR itself - a
+maintainer's only remaining job is reviewing and merging it, same as any
+other PR. (Same automation handles wallpaper submissions.)
 
 To do it yourself with git, create `community-apps/<slug>/` (lowercase
 letters, digits, `-`/`_` only) containing:
@@ -237,10 +240,14 @@ already correctly formatted.
 To submit one to the gallery, use the store page's "Submit a wallpaper"
 form to generate the issue text (name/author/description), then attach
 the image file to that issue yourself before posting it - GitHub issues
-can't be pre-filled with an attached file, only text. A maintainer adds
-it to `docs/wallpapers/` and an entry to `docs/wallpapers.json`
-(`name`, `author`, `description`, `image` - a `wallpapers/...` relative
-path - and optionally `repo`).
+can't be pre-filled with an attached file, only text. From there it's
+automatic: `.github/workflows/process-submissions.yml` downloads the
+attached image, adds it to `docs/wallpapers/`, and writes the
+`docs/wallpapers.json` entry (`name`, `author`, `description`, `image`)
+as a PR - a maintainer just reviews and merges it. No auto-publish
+straight to the live site, on purpose: this repo is public and anyone
+can open one of these issues, so a human still looks at the actual image
+before it goes out.
 
 Same hardware caveat as SD Card Apps above - the BMP-reading logic was
 checked byte-for-byte against real BMP files during development
