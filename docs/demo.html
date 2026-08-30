@@ -350,6 +350,14 @@
     ctx.beginPath(); ctx.moveTo(cx, cy + 8); ctx.lineTo(cx, cy + 12); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx - 6, cy + 12); ctx.lineTo(cx + 6, cy + 12); ctx.stroke();
   }
+  function iconStore(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(cx - 14, cy - 6); ctx.lineTo(cx - 10, cy - 16); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx + 14, cy - 6); ctx.lineTo(cx + 10, cy - 16); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 10, cy - 16); ctx.lineTo(cx + 10, cy - 16); ctx.stroke();
+    ctx.strokeRect(cx - 14, cy - 6, 28, 20);
+    ctx.fillStyle = c; ctx.fillRect(cx - 4, cy + 4, 8, 10);
+  }
 
   // ---------- shared state ----------
   const S = {
@@ -397,13 +405,14 @@
     { id: 'spotify', name: 'Spotify', icon: iconMusic },
     { id: 'settings', name: 'Settings', icon: iconGear },
     { id: 'files', name: 'Files', icon: iconFolder },
+    { id: 'store', name: 'App Store', icon: iconStore },
     { id: 'diagnostics', name: 'Diagnostics', icon: iconDiag },
   ];
   const APP_NAMES = {
     home: 'CydOs', wifi: 'WiFi Radar', flash: 'Flashlight', clock: 'Clock',
     qr: 'QR Beamer', dice: 'Dice', calc: 'Calculator', password: 'Password',
     morse: 'Morse', browser: 'Browser', obs: 'OBS', spotify: 'Spotify', settings: 'Settings',
-    files: 'Files', diagnostics: 'Diagnostics',
+    files: 'Files', diagnostics: 'Diagnostics', store: 'App Store',
   };
 
   // Diagnostics only gets a Home tile with Settings > Dev Mode on - same
@@ -483,6 +492,8 @@
     { id: 'default', name: 'Default' },
     { id: 'aurora', name: 'Aurora', from: '#0b1f3a', to: '#00d9f0' },
     { id: 'ember', name: 'Ember', from: '#2a0e0e', to: '#ffb020' },
+    { id: 'solar-flare', name: 'Solar Flare', from: '#1a0a06', to: '#ff8c28' },
+    { id: 'deep-space', name: 'Deep Space', from: '#140a2a', to: '#28c8b4' },
   ];
 
   function paintWallpaper(wp) {
@@ -1561,6 +1572,18 @@
     S.filesMode === 'confirmDelete' ? drawFilesConfirm() : drawFilesBrowse();
   }
 
+  // ---------- App Store (Community Edition apps) ----------
+  // Groups every Community Edition app under one Home tile instead of each
+  // getting its own slot - see src/apps/CommunityStoreApp.h. This demo has
+  // no generator step to populate it from, so it always shows the same
+  // empty state the real default firmware shows before you flash a
+  // Community Edition build with something in it.
+  function drawStore() {
+    clearContent();
+    centerText('No community apps installed', W / 2, H / 2 - 10, '500 11px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('coldzeeyt.github.io/cydos/store.html', W / 2, H / 2 + 10, '500 11px "IBM Plex Mono", monospace', Theme.muted);
+  }
+
   // ---------- Diagnostics (Dev Mode only) ----------
   const DIAG_TABS = ['display', 'touch', 'info'];
   const DIAG_TAB_LABELS = { display: 'Display', touch: 'Touch', info: 'Info' };
@@ -1647,16 +1670,19 @@
   }
 
   function drawDiagInfo() {
-    let y = STATUS_H + 34;
-    const lh = 20;
+    let y = STATUS_H + 30;
+    const lh = 18;
     ctx.fillStyle = Theme.text; ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
     const lines = [
       'Chip: ESP32 (browser demo)',
-      'Free heap: n/a in a browser tab',
+      'Reset: n/a in a browser tab',
+      'Heap: n/a in a browser tab',
+      'Sketch: n/a in a browser tab',
       'Flash: 4 MB (typical CYD)',
       'Uptime: ' + fmtHMS(performance.now(), false),
       'SD card: simulated (see Files)',
       'Battery: monitor disabled',
+      'WiFi: off',
     ];
     lines.forEach(function (line) { ctx.fillText(line, 12, y); y += lh; });
   }
@@ -1887,19 +1913,25 @@
     home: drawHome, wifi: drawWifi, flash: drawFlash, clock: drawClock,
     qr: drawQr, dice: drawDice, calc: drawCalc, password: drawPassword,
     morse: drawMorse, browser: drawBrowser, obs: drawObs, spotify: drawSpotify, settings: drawSettings,
-    files: drawFiles, diagnostics: drawDiagnostics,
+    files: drawFiles, diagnostics: drawDiagnostics, store: drawStore,
   };
 
   const LOCK_DOUBLE_TAP_WINDOW_MS = 600;
 
   function drawLockScreen() {
     ctx.fillStyle = Theme.bg; ctx.fillRect(0, 0, W, H);
+    // Same wallpaper as Home, plus flat panels behind the text so it stays
+    // legible over a bright gradient instead of floating bare on top of it.
+    paintWallpaper(WALLPAPERS.find(function (w) { return w.id === S.activeWallpaper; }));
+
     const secs = Math.floor(S.clockOffsetSec + performance.now() / 1000) % 86400;
     const h = String(Math.floor(secs / 3600)).padStart(2, '0');
     const m = String(Math.floor((secs % 3600) / 60)).padStart(2, '0');
+    roundRect(W / 2 - 70, H / 2 - 46, 140, 60, 10); ctx.fillStyle = Theme.panel; ctx.fill();
     centerText(`${h}:${m}`, W / 2, H / 2 - 20, '700 32px "IBM Plex Mono", monospace', Theme.accent);
-    centerText('CydOs', W / 2, H / 2 + 26, '500 12px "IBM Plex Mono", monospace', Theme.muted);
-    centerText('Double-tap to unlock', W / 2, H - 30, '500 12px "IBM Plex Mono", monospace', Theme.accent);
+    centerText('CydOs', W / 2, H / 2 + 10, '500 12px "IBM Plex Mono", monospace', Theme.muted);
+    roundRect(W / 2 - 90, H - 46, 180, 26, 8); ctx.fillStyle = Theme.panel; ctx.fill();
+    centerText('Double-tap to unlock', W / 2, H - 33, '500 12px "IBM Plex Mono", monospace', Theme.accent);
     registerHit(0, 0, W, H, function () {
       const now = performance.now();
       if (S.lastTapAt !== 0 && now - S.lastTapAt < LOCK_DOUBLE_TAP_WINDOW_MS) {

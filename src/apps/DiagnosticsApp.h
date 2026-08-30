@@ -4,6 +4,7 @@
 
 class Battery;
 class SdCard;
+class Touch;
 
 // A one-stop hardware check, gated behind Settings > Dev Mode since none
 // of this is something a regular user needs day to day (and a stray tap
@@ -17,7 +18,7 @@ class SdCard;
 //  - Info: chip/memory/uptime, SD card presence+size, battery voltage.
 class DiagnosticsApp : public App {
 public:
-  DiagnosticsApp(Battery* battery, SdCard* sd) : _battery(battery), _sd(sd) {}
+  DiagnosticsApp(Battery* battery, SdCard* sd, Touch* touch) : _battery(battery), _sd(sd), _touch(touch) {}
 
   const char* name() const override { return _title; }
 
@@ -34,9 +35,11 @@ private:
 
   Battery* _battery;
   SdCard* _sd;
+  Touch* _touch;
   Tab _tab = TAB_DISPLAY;
   uint8_t _pattern = 0;
   int16_t _touchX = -1, _touchY = -1;
+  int16_t _touchRawX = -1, _touchRawY = -1;
   uint32_t _lastInfoRefresh = 0;
   char _title[24] = "Diagnostics";
   bool _dirty = true;

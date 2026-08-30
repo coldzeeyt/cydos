@@ -29,6 +29,7 @@
 #include "apps/SdCardApp.h"
 #include "apps/FileManagerApp.h"
 #include "apps/DiagnosticsApp.h"
+#include "apps/CommunityStoreApp.h"
 
 TFT_eSPI tft;
 Touch touch;
@@ -53,7 +54,8 @@ ObsApp obsApp(&prefs);
 SpotifyApp spotifyApp(&prefs);
 SettingsApp settingsApp(&appManager, &touch, &prefs, &updateChecker, &wallClock, &sdCard);
 FileManagerApp fileManagerApp(&sdCard);
-DiagnosticsApp diagApp(&battery, &sdCard);
+DiagnosticsApp diagApp(&battery, &sdCard, &touch);
+CommunityStoreApp communityStoreApp(&appManager);
 
 // SD Card Apps: simple no-code screens (see src/apps/SdCardApp.h) loaded
 // from /cydos_apps/*.cydapp at boot. A fixed pool, same reasoning as the
@@ -111,6 +113,7 @@ void setup() {
   uint8_t settingsIdx = appManager.registerApp(&settingsApp);
   uint8_t filesIdx = appManager.registerApp(&fileManagerApp);
   uint8_t diagIdx = appManager.registerApp(&diagApp);
+  uint8_t storeIdx = appManager.registerApp(&communityStoreApp);
 
   homeApp.addTile(UI::iconWifi, wifiIdx);
   homeApp.addTile(UI::iconFlash, flashIdx);
@@ -125,6 +128,7 @@ void setup() {
   homeApp.addTile(UI::iconMusic, spotifyIdx);
   homeApp.addTile(UI::iconGear, settingsIdx);
   homeApp.addTile(UI::iconFolder, filesIdx);
+  homeApp.addTile(UI::iconStore, storeIdx);
   // Diagnostics only gets a Home tile with Settings > Dev Mode on - a
   // full-screen solid-red test pattern isn't something a regular user
   // should be able to stumble into by accident.
@@ -132,9 +136,12 @@ void setup() {
 
   // Community apps (see community-apps/ and scripts/generate_community.py):
   // this file is a no-op stub in a normal checkout, so `pio run -e cyd`
-  // builds the standard firmware untouched. The Community Edition build
-  // (CI, or `python3 scripts/generate_community.py` run locally first)
-  // overwrites it with one registerApp()+addTile() block per submitted app.
+  // builds the standard firmware untouched (communityStoreApp just shows
+  // its empty state). The Community Edition build (CI, or
+  // `python3 scripts/generate_community.py` run locally first) overwrites
+  // it with one registerApp()+communityStoreApp.addTile() block per
+  // submitted app - they all land inside the App Store tile above, not as
+  // separate top-level Home tiles.
 #include "community_registration.inc"
 
   // SD Card Apps - scanned once here at boot. touch.begin() above already
