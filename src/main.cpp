@@ -11,6 +11,7 @@
 #include "core/UpdateChecker.h"
 #include "core/WallClock.h"
 #include "core/SdCard.h"
+#include "core/SdAppPool.h"
 #include "core/Wallpaper.h"
 
 #include "apps/HomeApp.h"
@@ -26,7 +27,6 @@
 #include "apps/ObsApp.h"
 #include "apps/SpotifyApp.h"
 #include "apps/SettingsApp.h"
-#include "apps/SdCardApp.h"
 #include "apps/FileManagerApp.h"
 #include "apps/DiagnosticsApp.h"
 #include "apps/CommunityStoreApp.h"
@@ -39,6 +39,7 @@ Preferences prefs;
 UpdateChecker updateChecker;
 WallClock wallClock;
 SdCard sdCard;
+SdAppPool sdAppPool;
 
 HomeApp homeApp(&appManager);
 WifiRadarApp wifiApp;
@@ -55,14 +56,7 @@ SpotifyApp spotifyApp(&prefs);
 SettingsApp settingsApp(&appManager, &touch, &prefs, &updateChecker, &wallClock, &sdCard);
 FileManagerApp fileManagerApp(&sdCard);
 DiagnosticsApp diagApp(&battery, &sdCard, &touch);
-CommunityStoreApp communityStoreApp(&appManager);
-
-// SD Card Apps: simple no-code screens (see src/apps/SdCardApp.h) loaded
-// from /cydos_apps/*.cydapp at boot. A fixed pool, same reasoning as the
-// community app registration - only slots that actually loaded a file get
-// a Home tile. Editing the SD card takes effect on the next power-on.
-static constexpr uint8_t MAX_SD_APPS = 6;
-SdCardApp sdApps[MAX_SD_APPS];
+CommunityStoreApp communityStoreApp(&appManager, &prefs, &sdCard, &sdAppPool);
 
 uint8_t g_lastSavedBrightness = 80;
 uint32_t g_lastBrightnessCheck = 0;
@@ -144,35 +138,13 @@ void setup() {
   // separate top-level Home tiles.
 #include "community_registration.inc"
 
-  // SD Card Apps - scanned once here at boot. touch.begin() above already
-  // configured the shared SPI bus (see Cfg::SD_CS); if there's no card, or
-  // no /cydos_apps folder, this is a no-op and every slot stays unused.
-  if (sdCard.begin()) {
-    File dir = SD.open("/cydos_apps");
-    if (dir && dir.isDirectory()) {
-      uint8_t slot = 0;
-      File entry = dir.openNextFile();
-      while (entry && slot < MAX_SD_APPS) {
-        if (!entry.isDirectory()) {
-          String fname = entry.name();
-          String lower = fname; lower.toLowerCase();
-          if (lower.endsWith(".cydapp")) {
-            String path = fname.startsWith("/") ? fname : String("/cydos_apps/") + fname;
-            entry.close();
-            if (sdApps[slot].load(path.c_str())) {
-              uint8_t sdIdx = appManager.registerApp(&sdApps[slot]);
-              homeApp.addTile(UI::iconPuzzle, sdIdx);
-              slot++;
-            }
-            entry = dir.openNextFile();
-            continue;
-          }
-        }
-        entry.close();
-        entry = dir.openNextFile();
-      }
-    }
-  }
+  // SD Card Apps - scanned once here at boot, and again any time the App
+  // Store's Get More tab downloads a new one over WiFi (SdAppPool::rescan()
+  // is safe to call repeatedly - see src/core/SdAppPool.h). touch.begin()
+  // above already configured the shared SPI bus (see Cfg::SD_CS); if
+  // there's no card, or no /cydos_apps folder, this is a no-op.
+  sdAppPool.begin(&appManager, &homeApp);
+  if (sdCard.begin()) sdAppPool.rescan();
 
   if (appManager.lockScreenEnabled()) {
     appManager.beginLocked(&wallClock);
@@ -201,7 +173,7 @@ void loop() {
   // on/off timing a Morse signal depends on.
   if (appManager.currentApp() != &wifiApp && appManager.currentApp() != &browserApp &&
       appManager.currentApp() != &obsApp && appManager.currentApp() != &spotifyApp &&
-      appManager.currentApp() != &morseApp) {
+      appManager.currentApp() != &morseApp && appManager.currentApp() != &communityStoreApp) {
     updateChecker.update();
   }
 

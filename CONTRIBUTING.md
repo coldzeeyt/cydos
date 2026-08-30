@@ -210,14 +210,32 @@ text=Pass: hunter2
 - `text` - up to 6 lines, each shown centered, stacked, in the order they
   appear. With none, the screen just shows `name` centered instead.
 
-CydOs scans `/cydos_apps/*.cydapp` once at boot (up to 6 files) and adds
-a Home tile for each one it can parse - editing the card takes effect on
-the next power-cycle, not live. No submission process needed for
-personal use; if you want it listed on the store page's directory of
-example files, open a PR adding it under `community-apps/` alongside an
-`app.json` the same shape as a Community Edition one (see above) so
-others can find and copy it - the file itself still only ever runs off
-an SD card, never compiled into any firmware.
+CydOs scans `/cydos_apps/*.cydapp` at boot, and again any time the
+on-device **App Store → Get More** tab downloads a new one over WiFi
+(see below) - either way it adds a Home tile for each one it can parse
+(up to 6 at a time). Editing the card by hand still only takes effect on
+the next power-cycle; a WiFi download shows up immediately, no reboot.
+
+No submission process needed for personal use - just put the file on
+your own card. To get one listed in the App Store's **Get More** tab so
+anyone can download it over WiFi, open a PR adding
+`sd-apps/<slug>/app.json` + `sd-apps/<slug>/yourfile.cydapp`:
+```json
+{
+  "name": "WiFi Card",
+  "author": "your GitHub handle or name",
+  "description": "One sentence - what it does, not how.",
+  "file": "yourfile.cydapp"
+}
+```
+`scripts/generate_ondevice_catalog.py` (run automatically by
+`.github/workflows/ondevice-catalog.yml` on merge) turns that into
+`docs/ondevice_apps.txt` and a copy under `docs/sdapps/` - the manifest
+`src/core/AppStore.h` fetches on-device. Verify locally before opening
+the PR: `pip install pillow && python3 scripts/generate_ondevice_catalog.py`
+(the pillow dependency is only for wallpapers - see below). Either way,
+the file itself still only ever runs off an SD card, never compiled into
+any firmware.
 
 **Hardware note:** the SD slot shares its SPI bus with the touch
 controller on this board (same CLK/MOSI/MISO, separate CS lines - see
@@ -246,10 +264,17 @@ can't be pre-filled with an attached file, only text. From there it's
 automatic: `.github/workflows/process-submissions.yml` downloads the
 attached image, adds it to `docs/wallpapers/`, and writes the
 `docs/wallpapers.json` entry (`name`, `author`, `description`, `image`)
-as a PR - a maintainer just reviews and merges it. No auto-publish
-straight to the live site, on purpose: this repo is public and anyone
-can open one of these issues, so a human still looks at the actual image
-before it goes out.
+as a PR - a maintainer (or an automated review pass, for this repo)
+reviews and merges it. No auto-publish straight to the live site, on
+purpose: this repo is public and anyone can open one of these issues, so
+someone still looks at the actual image before it goes out.
+
+Once merged, `.github/workflows/ondevice-catalog.yml` automatically
+regenerates a device-ready 320×214 BMP under `docs/wallpapers_bmp/` and
+adds an entry to `docs/ondevice_wallpapers.txt` - that's what makes the
+wallpaper show up in the on-device **App Store → Get More** tab
+(downloads it straight to `/cydos_wallpapers/` over WiFi, no computer
+needed). Nothing to do by hand for this beyond the submission itself.
 
 Same hardware caveat as SD Card Apps above - the BMP-reading logic was
 checked byte-for-byte against real BMP files during development

@@ -19,6 +19,8 @@ public:
   // file is never a crash, just an empty slot nothing gets registered for.
   bool load(const char* path) {
     _loaded = false;
+    strncpy(_path, path, sizeof(_path) - 1);
+    _path[sizeof(_path) - 1] = 0;
     File f = SD.open(path);
     if (!f) return false;
 
@@ -57,6 +59,7 @@ public:
   }
 
   bool loaded() const { return _loaded; }
+  const char* path() const { return _path; }
 
   void onEnter(TFT_eSPI& tft) override { _dirty = true; }
 
@@ -90,6 +93,7 @@ private:
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
   }
 
+  char _path[48] = {0};
   char _name[NAME_LEN] = {0};
   uint16_t _bgColor = Theme::BG;
   char _lines[MAX_LINES][MAX_LINE_LEN + 1] = {{0}};

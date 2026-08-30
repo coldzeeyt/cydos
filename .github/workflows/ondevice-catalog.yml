@@ -1,0 +1,56 @@
+name: On-Device App Store Catalog
+
+# Regenerates the tiny manifests (docs/ondevice_apps.txt,
+# docs/ondevice_wallpapers.txt) and the files they point at
+# (docs/sdapps/*.cydapp, docs/wallpapers_bmp/*.bmp) that the firmware's
+# App Store > Get More tab fetches over WiFi - see
+# scripts/generate_ondevice_catalog.py and src/core/AppStore.h.
+#
+# Runs on every push that touches a wallpaper or SD app source, which
+# after a wallpaper/app submission PR merges (including ones the
+# automated submission-PR triage merges on its own) is exactly when this
+# needs to happen - otherwise something newly merged on the website
+# would silently never show up in the on-device downloader.
+#
+# Same "no main branch here" note as community-firmware.yml: the
+# `branches:` filter can't use a runtime expression, so it's hardcoded to
+# this repo's actual default branch.
+on:
+  push:
+    branches: [claude/cydos-multitool-utilities-j63its]
+    paths:
+      - "sd-apps/**"
+      - "docs/wallpapers.json"
+      - "docs/wallpapers/**"
+      - "scripts/generate_ondevice_catalog.py"
+      - ".github/workflows/ondevice-catalog.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Pillow
+        run: python3 -m pip install --upgrade pillow
+
+      - name: Generate on-device catalog
+        run: python3 scripts/generate_ondevice_catalog.py
+
+      - name: Commit the regenerated catalog
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/ondevice_apps.txt docs/ondevice_wallpapers.txt docs/sdapps docs/wallpapers_bmp
+          if git diff --cached --quiet; then
+            echo "Nothing changed, skipping commit."
+            exit 0
+          fi
+          git commit -m "Regenerate on-device App Store catalog [skip ci]"
+          git push

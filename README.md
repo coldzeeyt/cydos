@@ -75,10 +75,14 @@ same gesture the rest of the launcher uses to tell a tap from a drag.
   Settings' Touch Test), and **Info** (chip/CPU, reset reason, heap and
   sketch space, flash size, uptime, SD card size, battery voltage, WiFi
   status).
-- **App Store** — every Community Edition app (see below) lands here as
-  one shared 3x3 grid instead of each claiming its own top-level Home
-  tile. Shows an empty state with a link to the store site until you've
-  flashed a Community Edition build with something in it.
+- **App Store** — two tabs. **Installed**: every Community Edition app
+  (see below) baked into this firmware build, in one shared 3x3 grid
+  instead of each claiming its own top-level Home tile. **Get More**:
+  fetches a small catalog from the website over WiFi and downloads a
+  wallpaper or SD Card App straight onto the SD card - a downloaded app
+  becomes a real Home tile immediately, no reboot (see the App Store
+  section below for how this differs from Community Edition apps, which
+  can't work this way).
 
 ## Lock Screen
 
@@ -125,13 +129,23 @@ Community Edition reads files straight off the card, no reflash needed.
   `name=`/`bg=`/`text=` file (see [`CONTRIBUTING.md`](CONTRIBUTING.md)
   for the format) at `/cydos_apps/yourfile.cydapp` on a FAT32 microSD
   card, power-cycle the CYD, and it shows up as a Home tile — up to 6 at
-  once. Editing the card takes effect on the next boot, not live.
+  once. Editing the card by hand takes effect on the next boot, not live -
+  but see **App Store → Get More** below for a way that doesn't.
 - **Wallpapers** — the store page has an in-browser creator: upload any
   image, it crops to fit, and you download a `.bmp` already in the exact
   format CydOs reads. Drop one at `/cydos_wallpaper.bmp` on the card and
   it becomes Home's background on next boot - or drop several into
   `/cydos_wallpapers/` and switch between them any time from
   **Settings → Wallpapers**, with a live preview before you apply one.
+- **App Store → Get More (WiFi, no SD card handling)** — the on-device
+  **App Store** app's second tab fetches a small catalog straight from
+  the website over WiFi and downloads whatever you pick directly onto the
+  SD card - no computer needed at all. A wallpaper just becomes available
+  in Settings → Wallpapers; an SD Card App becomes a real Home tile
+  immediately, no reboot. This only carries SD Card Apps and wallpapers -
+  Community Edition apps are compiled into the firmware image itself, and
+  this hardware has no way to load compiled code at runtime, so those
+  still need the reflash described below no matter what.
 - **Community Edition** — for real interactive apps (not static
   screens), written in C++ against the same `App` interface the built-in
   apps use. No SD card needed, but it's a full firmware reflash: submit

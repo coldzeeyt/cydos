@@ -1,0 +1,4 @@
+launcher-glow|Launcher Glow|/wallpapers_bmp/launcher-glow.bmp
+solar-flare|Solar Flare|/wallpapers_bmp/solar-flare.bmp
+deep-space|Deep Space|/wallpapers_bmp/deep-space.bmp
+cyd|cyd|/wallpapers_bmp/cyd.bmp
