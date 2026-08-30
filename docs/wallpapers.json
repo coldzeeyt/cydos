@@ -10,5 +10,11 @@
     "author": "davidnilssavage",
     "description": "A warm amber-to-red launcher wallpaper with the same faint circuit grid and app-tile motifs as Launcher Glow, in a hotter palette.",
     "image": "wallpapers/solar-flare.png"
+  },
+  {
+    "name": "Deep Space",
+    "author": "davidnilssavage",
+    "description": "A cool indigo-to-teal launcher wallpaper, same circuit-grid and app-tile motif family as Launcher Glow and Solar Flare.",
+    "image": "wallpapers/deep-space.png"
   }
 ]
