@@ -109,11 +109,6 @@ inline void iconWifi(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   }
   tft.fillCircle(cx, cy + 6, 2, c);
 }
-inline void iconLevel(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
-  tft.drawCircle(cx, cy, 14, c);
-  tft.drawFastHLine(cx - 14, cy, 28, c);
-  tft.fillCircle(cx + 4, cy - 2, 4, c);
-}
 inline void iconFlash(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.fillCircle(cx, cy, 10, c);
   for (int a = 0; a < 360; a += 45) {
