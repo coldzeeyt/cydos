@@ -13,6 +13,10 @@ UI::Rect HomeApp::tileRectInPage(uint8_t i) const {
 }
 
 void HomeApp::drawPage(TFT_eSPI& tft, uint8_t page, int16_t xOffset) {
+  // Highlight whichever tile is currently under a finger that hasn't
+  // moved far enough to count as a swipe yet - simple press feedback.
+  int8_t pressedIdx = (_dragging && !_isSwipe) ? tileAt(page, _dragStartX, _dragStartY) : -1;
+
   uint16_t start = page * TILES_PER_PAGE;
   uint16_t end = start + TILES_PER_PAGE;
   if (end > _tileCount) end = _tileCount;
@@ -21,17 +25,19 @@ void HomeApp::drawPage(TFT_eSPI& tft, uint8_t page, int16_t xOffset) {
     UI::Rect cell = tileRectInPage(i - start);
     cell.x += xOffset;
     App* app = _mgr->appAt(_appIndex[i]);
+    bool pressed = (i == (uint16_t)pressedIdx);
 
-    int16_t pad = 4;
+    int16_t pad = 5;
     UI::Rect card{(int16_t)(cell.x + pad), (int16_t)(cell.y + pad), (int16_t)(cell.w - pad * 2), (int16_t)(cell.h - pad * 2)};
-    tft.fillRoundRect(card.x, card.y, card.w, card.h, 8, Theme::PANEL);
+    uint16_t fill = pressed ? Theme::PANEL2 : Theme::PANEL;
+    tft.fillRoundRect(card.x, card.y, card.w, card.h, 8, fill);
+    tft.drawRoundRect(card.x, card.y, card.w, card.h, 8, pressed ? Theme::ACCENT : Theme::PANEL2);
 
     int16_t cx = card.x + card.w / 2;
-    int16_t cy = card.y + card.h / 2 - 9;
-    tft.fillCircle(cx, cy, 17, Theme::PANEL2);
+    int16_t cy = card.y + card.h / 2 - 8;
     if (_icons[i]) _icons[i](tft, cx, cy, Theme::ACCENT);
 
-    tft.setTextColor(Theme::TEXT, Theme::PANEL);
+    tft.setTextColor(Theme::TEXT, fill);
     tft.setTextDatum(MC_DATUM);
     tft.drawString(app ? app->name() : "?", cx, card.y + card.h - 13, 1);
     tft.setTextDatum(TL_DATUM);
@@ -74,6 +80,7 @@ void HomeApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
     _dragOffsetX = 0;
     _dragging = true;
     _isSwipe = false;
+    _dirty = true; // show the pressed tile immediately
     return;
   }
   if (!_dragging) return;
@@ -99,5 +106,6 @@ void HomeApp::onTouchUp() {
   } else {
     int8_t idx = tileAt(_page, _dragStartX, _dragStartY);
     if (idx >= 0) _mgr->openApp(_appIndex[idx]);
+    else _dirty = true; // tapped empty space - just clear the press highlight
   }
 }

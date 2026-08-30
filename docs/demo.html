@@ -342,7 +342,7 @@
     timerAlarmUntil: 0,
     browserMode: 'url', browserUrl: 'example.com', browserLoading: false,
     browserLines: [], browserScroll: 0, browserLinesVisible: 0,
-    homePage: 0, homeDragStartX: 0, homeDragStartY: 0, homeDragOffsetX: 0, homeIsSwipe: false,
+    homePage: 0, homeDragStartX: 0, homeDragStartY: 0, homeDragOffsetX: 0, homeIsSwipe: false, homeDragging: false,
   };
 
   const TILES = [
@@ -400,14 +400,20 @@
   }
 
   function drawHomePage(page, xOffset) {
+    // Highlight whichever tile is under a finger that hasn't moved far
+    // enough to count as a swipe yet - simple press feedback.
+    const pressedIdx = (S.homeDragging && !S.homeIsSwipe) ? homeTileAt(page, S.homeDragStartX, S.homeDragStartY) : -1;
+
     const start = page * HOME_TILES_PER_PAGE, end = Math.min(start + HOME_TILES_PER_PAGE, TILES.length);
     for (let i = start; i < end; i++) {
       const cell = homeTileRectInPage(i - start);
-      const pad = 4;
+      const pressed = i === pressedIdx;
+      const pad = 5;
       const cardX = cell.x + xOffset + pad, cardY = cell.y + pad, cardW = cell.w - pad * 2, cardH = cell.h - pad * 2;
-      roundRect(cardX, cardY, cardW, cardH, 8); ctx.fillStyle = Theme.panel; ctx.fill();
-      const cx = cardX + cardW / 2, cy = cardY + cardH / 2 - 9;
-      ctx.beginPath(); ctx.arc(cx, cy, 17, 0, Math.PI * 2); ctx.fillStyle = Theme.panel2; ctx.fill();
+      roundRect(cardX, cardY, cardW, cardH, 8);
+      ctx.fillStyle = pressed ? Theme.panel2 : Theme.panel; ctx.fill();
+      ctx.strokeStyle = pressed ? Theme.accent : Theme.panel2; ctx.lineWidth = 1; ctx.stroke();
+      const cx = cardX + cardW / 2, cy = cardY + cardH / 2 - 8;
       TILES[i].icon(cx, cy, Theme.accent);
       centerText(TILES[i].name, cx, cardY + cardH - 12, '500 10px "IBM Plex Mono", monospace', Theme.text);
     }
@@ -435,7 +441,7 @@
     registerHit(0, STATUS_H, W, H - STATUS_H,
       function (px, py) {
         S.homeDragStartX = px; S.homeDragStartY = py;
-        S.homeDragOffsetX = 0; S.homeIsSwipe = false;
+        S.homeDragOffsetX = 0; S.homeIsSwipe = false; S.homeDragging = true;
       },
       function (px, py) {
         const dx = px - S.homeDragStartX;
@@ -443,6 +449,7 @@
         if (S.homeIsSwipe) S.homeDragOffsetX = dx;
       },
       function () {
+        S.homeDragging = false;
         if (S.homeIsSwipe) {
           const pages = homePageCount();
           if (S.homeDragOffsetX <= -HOME_SWIPE_PAGE_THRESHOLD && S.homePage + 1 < pages) S.homePage++;
@@ -1005,7 +1012,7 @@
       onTap: function () { S.showBattery = !S.showBattery; },
     });
 
-    centerText('CydOs v1.4 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    centerText('CydOs v1.5 (browser demo)', W / 2, H - 10, '500 10px "IBM Plex Mono", monospace', Theme.muted);
   }
 
   function drawSettingsTime() {
