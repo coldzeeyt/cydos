@@ -69,25 +69,26 @@ uint32_t g_lastBrightnessCheck = 0;
 // no calibration, no navigation, no target you need to hit. For a touch
 // panel miscalibrated badly enough that even Home's biggest tile isn't
 // reliably tappable (see Settings > Touch Test, which needs working touch
-// to reach in the first place - this doesn't). Entered by holding the
-// board's physical BOOT button (GPIO0, active-low) during power-on/reset -
-// a real button, not a touch target, so it works no matter how wrong
-// Cfg::TOUCH_* is. Never returns; power-cycle without holding BOOT to
-// boot normally again.
+// to reach in the first place - this doesn't).
+//
+// Entered by holding the board's physical BOOT button (GPIO0, active-low)
+// for about a second - but only *after* CydOs has already booted normally
+// (see the debounced check in loop()), never during power-on/reset itself:
+// the ESP32's own boot ROM samples GPIO0 at that exact moment to decide
+// whether to enter USB flashing mode, before any of this firmware's code
+// runs at all, so holding BOOT while plugging in or resetting the board
+// skips straight past this entirely and puts the chip in download mode
+// instead. tft/touch are already initialized by normal setup() by the
+// time this can run, so it doesn't redo that. Never returns; power-cycle
+// (without touching BOOT) to boot normally again.
 void runTouchDiagMode() {
-  tft.init();
-  tft.setRotation(Cfg::SCREEN_ROTATION);
-  Display::beginBacklight();
-  Display::setBrightnessPercent(100);
-  touch.begin();
-
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
   tft.setTextDatum(TL_DATUM);
   tft.drawString("Touch Diagnostic Mode", 10, 8, 2);
-  tft.drawString("(entered by holding BOOT at power-on)", 10, 30, 1);
+  tft.drawString("(entered by holding BOOT for 1s after boot)", 10, 30, 1);
   tft.drawString("Press each corner, note the raw numbers below.", 10, 44, 1);
-  tft.drawString("Power-cycle without holding BOOT to exit.", 10, 58, 1);
+  tft.drawString("Power-cycle without touching BOOT to exit.", 10, 58, 1);
 
   int16_t minX = 32767, maxX = -32768, minY = 32767, maxY = -32768;
   int16_t lastRx = -1, lastRy = -1;
@@ -122,9 +123,7 @@ void runTouchDiagMode() {
 
 void setup() {
   Serial.begin(115200);
-
-  pinMode(0, INPUT_PULLUP);
-  if (digitalRead(0) == LOW) runTouchDiagMode(); // never returns
+  pinMode(0, INPUT_PULLUP); // BOOT button - polled (debounced) from loop(), see runTouchDiagMode()
 
   prefs.begin("cydos", false);
   uint8_t savedBrightness = prefs.getUChar("bright", 80);
@@ -225,6 +224,17 @@ void setup() {
 }
 
 void loop() {
+  // Held for ~1s (debounced against a brief/accidental press), this drops
+  // into runTouchDiagMode() and never returns to the rest of loop() - see
+  // its comment for why the check lives here and not in setup().
+  static uint32_t bootHeldSince = 0;
+  if (digitalRead(0) == LOW) {
+    if (bootHeldSince == 0) bootHeldSince = millis();
+    else if (millis() - bootHeldSince > 1000) runTouchDiagMode();
+  } else {
+    bootHeldSince = 0;
+  }
+
   static int16_t lastX = 0, lastY = 0;
   static bool wasDown = false;
 
