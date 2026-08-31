@@ -65,8 +65,66 @@ UnitConverterApp convertApp;
 uint8_t g_lastSavedBrightness = 80;
 uint32_t g_lastBrightnessCheck = 0;
 
+// Reads and shows nothing but raw touch ADC values, full-screen, forever -
+// no calibration, no navigation, no target you need to hit. For a touch
+// panel miscalibrated badly enough that even Home's biggest tile isn't
+// reliably tappable (see Settings > Touch Test, which needs working touch
+// to reach in the first place - this doesn't). Entered by holding the
+// board's physical BOOT button (GPIO0, active-low) during power-on/reset -
+// a real button, not a touch target, so it works no matter how wrong
+// Cfg::TOUCH_* is. Never returns; power-cycle without holding BOOT to
+// boot normally again.
+void runTouchDiagMode() {
+  tft.init();
+  tft.setRotation(Cfg::SCREEN_ROTATION);
+  Display::beginBacklight();
+  Display::setBrightnessPercent(100);
+  touch.begin();
+
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextDatum(TL_DATUM);
+  tft.drawString("Touch Diagnostic Mode", 10, 8, 2);
+  tft.drawString("(entered by holding BOOT at power-on)", 10, 30, 1);
+  tft.drawString("Press each corner, note the raw numbers below.", 10, 44, 1);
+  tft.drawString("Power-cycle without holding BOOT to exit.", 10, 58, 1);
+
+  int16_t minX = 32767, maxX = -32768, minY = 32767, maxY = -32768;
+  int16_t lastRx = -1, lastRy = -1;
+
+  while (true) {
+    int16_t rx, ry;
+    if (touch.readRaw(rx, ry) && (rx != lastRx || ry != lastRy)) {
+      lastRx = rx;
+      lastRy = ry;
+      if (rx < minX) minX = rx;
+      if (rx > maxX) maxX = rx;
+      if (ry < minY) minY = ry;
+      if (ry > maxY) maxY = ry;
+
+      tft.fillRect(0, 80, Cfg::SCREEN_W, Cfg::SCREEN_H - 80, TFT_BLACK);
+      char buf[48];
+      tft.setTextColor(TFT_CYAN, TFT_BLACK);
+      snprintf(buf, sizeof(buf), "raw X: %d", rx);
+      tft.drawString(buf, 10, 90, 4);
+      snprintf(buf, sizeof(buf), "raw Y: %d", ry);
+      tft.drawString(buf, 10, 130, 4);
+
+      tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+      snprintf(buf, sizeof(buf), "X seen so far: %d to %d", minX, maxX);
+      tft.drawString(buf, 10, 180, 1);
+      snprintf(buf, sizeof(buf), "Y seen so far: %d to %d", minY, maxY);
+      tft.drawString(buf, 10, 196, 1);
+    }
+    delay(30);
+  }
+}
+
 void setup() {
   Serial.begin(115200);
+
+  pinMode(0, INPUT_PULLUP);
+  if (digitalRead(0) == LOW) runTouchDiagMode(); // never returns
 
   prefs.begin("cydos", false);
   uint8_t savedBrightness = prefs.getUChar("bright", 80);
