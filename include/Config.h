@@ -32,7 +32,7 @@ constexpr int16_t TOUCH_RAW_Y_MIN = 300;
 constexpr int16_t TOUCH_RAW_Y_MAX = 3800;
 constexpr bool TOUCH_SWAP_XY = true;
 constexpr bool TOUCH_INVERT_X = false;
-constexpr bool TOUCH_INVERT_Y = true;
+constexpr bool TOUCH_INVERT_Y = false;
 
 // ---- MicroSD (shares the touch controller's SPI bus - same CLK/MOSI/MISO,
 // its own CS line - standard CYD wiring; see src/core/SdCard.h) ----
