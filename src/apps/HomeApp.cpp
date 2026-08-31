@@ -71,11 +71,29 @@ void HomeApp::draw(TFT_eSPI& tft) {
       if (p == _page) tft.fillCircle(cx, dotsY, 3, Theme::ACCENT);
       else tft.drawCircle(cx, dotsY, 3, Theme::MUTED);
     }
+
+    UI::Rect prev = prevPageBtnRect(), next = nextPageBtnRect();
+    tft.setTextDatum(MC_DATUM);
+    tft.setTextColor(_page > 0 ? Theme::TEXT : Theme::MUTED, Theme::BG);
+    tft.drawString("<", prev.x + prev.w / 2, prev.y + prev.h / 2 + 1, 2);
+    tft.setTextColor(_page + 1 < pages ? Theme::TEXT : Theme::MUTED, Theme::BG);
+    tft.drawString(">", next.x + next.w / 2, next.y + next.h / 2 + 1, 2);
+    tft.setTextDatum(TL_DATUM);
   }
 }
 
 void HomeApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
   if (down) {
+    if (pageCount() > 1) {
+      if (prevPageBtnRect().contains(x, y)) {
+        if (_page > 0) { _page--; _dirty = true; }
+        return;
+      }
+      if (nextPageBtnRect().contains(x, y)) {
+        if (_page + 1 < pageCount()) { _page++; _dirty = true; }
+        return;
+      }
+    }
     _dragStartX = x;
     _dragStartY = y;
     _dragOffsetX = 0;

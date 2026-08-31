@@ -632,6 +632,21 @@
           if (idx >= 0) openApp(visibleTiles()[idx].id);
         }
       });
+
+    // Explicit prev/next page buttons (see HomeApp.h) - registered after
+    // the whole-grid hitbox above so they win the last-match-wins hit
+    // test instead of starting a drag underneath them.
+    if (pages > 1) {
+      const prevActive = S.homePage > 0, nextActive = S.homePage + 1 < pages;
+      ctx.font = '600 12px "IBM Plex Mono", monospace'; ctx.textAlign = 'center';
+      ctx.fillStyle = prevActive ? Theme.text : Theme.muted;
+      ctx.fillText('<', 17, H - 9);
+      ctx.fillStyle = nextActive ? Theme.text : Theme.muted;
+      ctx.fillText('>', W - 17, H - 9);
+      ctx.textAlign = 'left';
+      registerHit(0, H - 18, 34, 18, function () { if (S.homePage > 0) S.homePage--; });
+      registerHit(W - 34, H - 18, 34, 18, function () { if (S.homePage + 1 < homePageCount()) S.homePage++; });
+    }
   }
 
   function currentAppTitle() {

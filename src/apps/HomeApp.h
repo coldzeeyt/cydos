@@ -55,4 +55,12 @@ private:
   UI::Rect tileRectInPage(uint8_t indexInPage) const;
   void drawPage(TFT_eSPI& tft, uint8_t page, int16_t xOffset);
   int8_t tileAt(uint8_t page, int16_t x, int16_t y) const; // -1 if none
+
+  // Explicit prev/next page buttons - some touch panels track a drag
+  // badly enough that swiping never reliably crosses SWIPE_PAGE_THRESHOLD,
+  // so this doesn't depend on a working swipe gesture at all. Only shown
+  // (and only hit-tested) when there's more than one page, same condition
+  // the page dots already use.
+  UI::Rect prevPageBtnRect() const { return {0, (int16_t)(Cfg::SCREEN_H - 18), 34, 18}; }
+  UI::Rect nextPageBtnRect() const { return {(int16_t)(Cfg::SCREEN_W - 34), (int16_t)(Cfg::SCREEN_H - 18), 34, 18}; }
 };
