@@ -30,7 +30,7 @@ constexpr int16_t TOUCH_RAW_X_MIN = 300;
 constexpr int16_t TOUCH_RAW_X_MAX = 3800;
 constexpr int16_t TOUCH_RAW_Y_MIN = 300;
 constexpr int16_t TOUCH_RAW_Y_MAX = 3800;
-constexpr bool TOUCH_SWAP_XY = true;
+constexpr bool TOUCH_SWAP_XY = false;
 constexpr bool TOUCH_INVERT_X = false;
 constexpr bool TOUCH_INVERT_Y = false;
 

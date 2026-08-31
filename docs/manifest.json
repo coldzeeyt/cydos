@@ -5,7 +5,7 @@
     {
       "chipFamily": "ESP32",
       "parts": [
-        { "path": "firmware/CydOs.bin", "offset": 0 }
+        { "path": "firmware/CydOs.bin?v=1788211650", "offset": 0 }
       ]
     }
   ]

@@ -90,7 +90,17 @@ void HomeApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
   if (abs(dx) > SWIPE_MOVE_THRESHOLD) _isSwipe = true;
   if (_isSwipe) {
     _dragOffsetX = dx;
-    _dirty = true;
+    // draw() re-reads and re-decodes the wallpaper BMP from the SD card
+    // every time it runs (see Wallpaper.h) - fine once, but with no
+    // throttle here this fired on every single touch sample for the
+    // whole swipe (uncapped, easily 50-100+/sec), redoing that SD read
+    // that many times a second and showing up as heavy flashing/tearing.
+    // ~16fps is still smooth for tracking a drag and cuts that by 4-6x.
+    uint32_t now = millis();
+    if (now - _lastDragRedraw > 60) {
+      _lastDragRedraw = now;
+      _dirty = true;
+    }
   }
 }
 

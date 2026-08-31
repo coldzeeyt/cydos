@@ -49,6 +49,7 @@ private:
   int16_t _dragOffsetX = 0;
   bool _dragging = false;
   bool _isSwipe = false;
+  uint32_t _lastDragRedraw = 0;
 
   uint8_t pageCount() const { return (_tileCount + TILES_PER_PAGE - 1) / TILES_PER_PAGE; }
   UI::Rect tileRectInPage(uint8_t indexInPage) const;
