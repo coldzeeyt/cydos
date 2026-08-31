@@ -1,6 +1,7 @@
 #pragma once
 #include <SD.h>
 #include "AppManager.h"
+#include "SdCard.h"
 #include "UI.h"
 #include "apps/SdCardApp.h"
 #include "apps/HomeApp.h"
@@ -20,9 +21,11 @@ public:
   }
 
   void rescan() {
+    SdCard::useSdBus();
     File dir = SD.open("/cydos_apps");
     if (!dir || !dir.isDirectory()) {
       if (dir) dir.close();
+      SdCard::useTouchBus();
       return;
     }
 
@@ -44,6 +47,7 @@ public:
       entry = dir.openNextFile();
     }
     dir.close();
+    SdCard::useTouchBus();
   }
 
 private:

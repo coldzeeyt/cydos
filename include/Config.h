@@ -34,8 +34,21 @@ constexpr bool TOUCH_SWAP_XY = false;
 constexpr bool TOUCH_INVERT_X = false;
 constexpr bool TOUCH_INVERT_Y = false;
 
-// ---- MicroSD (shares the touch controller's SPI bus - same CLK/MOSI/MISO,
-// its own CS line - standard CYD wiring; see src/core/SdCard.h) ----
+// ---- MicroSD ----
+// Originally assumed this shared the touch controller's exact CLK/MOSI/
+// MISO lines with just its own CS - that's what several CYD wiring
+// references describe. Real hardware disagreed: the card still wasn't
+// detected even after fixing a genuine, separate display/touch SPI
+// peripheral conflict (see USE_HSPI_PORT in platformio.ini), which pointed
+// at the SD slot actually being wired to its own dedicated lines instead -
+// the ones several *other* CYD references use. See src/core/SdCard.h for
+// how CydOs now switches the shared SPI bus between this pinout and
+// Cfg::TOUCH_* around every SD access, since ESP32 only has two usable
+// hardware SPI peripherals for three devices that need one (display,
+// touch, SD) once the display has its own.
+constexpr int8_t SD_CLK = 18;
+constexpr int8_t SD_MOSI = 23;
+constexpr int8_t SD_MISO = 19;
 constexpr int8_t SD_CS = 5;
 
 // ---- Backlight (PWM brightness control) ----

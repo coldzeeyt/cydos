@@ -95,8 +95,10 @@ void CommunityStoreApp::loadBrowseCatalog(TFT_eSPI& tft) {
     return n;
   };
 
+  SdCard::useSdBus();
   uint8_t appCount = addItems("/ondevice_apps.txt", true, "/cydos_apps");
   uint8_t wpCount = addItems("/ondevice_wallpapers.txt", false, "/cydos_wallpapers");
+  SdCard::useTouchBus();
 
   _browsePage = 0;
   _browseState = (appCount == 0 && wpCount == 0) ? FAILED : LOADED;
@@ -107,7 +109,9 @@ void CommunityStoreApp::downloadItem(TFT_eSPI& tft, uint8_t idx) {
   const char* base = strrchr(item.urlPath, '/');
   base = base ? base + 1 : item.urlPath;
   const char* destDir = item.isApp ? "/cydos_apps" : "/cydos_wallpapers";
+  SdCard::useSdBus();
   if (!SD.exists(destDir)) SD.mkdir(destDir);
+  SdCard::useTouchBus();
   char destPath[64];
   snprintf(destPath, sizeof(destPath), "%s/%s", destDir, base);
 
@@ -115,7 +119,7 @@ void CommunityStoreApp::downloadItem(TFT_eSPI& tft, uint8_t idx) {
   drawTabBar(tft);
   char label[48];
   snprintf(label, sizeof(label), "Downloading %s...", item.name);
-  bool ok = AppStore::downloadToSd(tft, item.urlPath, destPath, label);
+  bool ok = AppStore::downloadToSd(tft, item.urlPath, destPath, label); // re-points the bus itself, see SdCard.h
 
   if (ok) {
     item.installed = true;

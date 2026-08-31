@@ -413,7 +413,7 @@
     diagTab: 'display', diagPattern: 0, diagTouchX: -1, diagTouchY: -1,
     devMode: false, activeWallpaper: 'default', wpPreviewId: null,
     storeMode: 'installed', storeBrowseState: 'notLoaded', storeItems: [], storePage: 0, downloadedSdApps: [], downloadedWallpapers: [],
-    wifiSsid: '', wifiPass: '', settingsWifiField: 'ssid',
+    wifiSsid: '', wifiPass: '', settingsWifiField: 'ssid', wifiKbShift: false,
     wifiBusy: false, wifiBusyUntil: 0, wifiBusyNext: null,
     obsSyncError: false, spotifySyncError: false, storeDownloadError: null,
     notesText: '', notesMode: 'view',
@@ -2296,15 +2296,19 @@
       const keyW = W / row.length;
       for (let c = 0; c < row.length; c++) {
         const x = c * keyW + 1, y = top + r * rowH;
+        // toUpperCase() is a no-op on digits/symbols, so this is safe to
+        // apply across every row without special-casing which are letters.
         const ch = row[c];
-        button(x, y, keyW - 2, rowH - 4, ch, { onTap: function () { if (S[field].length < 64) S[field] += ch; } });
+        const shownCh = S.wifiKbShift ? ch.toUpperCase() : ch;
+        button(x, y, keyW - 2, rowH - 4, shownCh, { onTap: function () { if (S[field].length < 64) S[field] += shownCh; } });
       }
     });
 
     const ctrlY = top + WIFI_KB_ROWS.length * rowH + 4;
-    button(4, ctrlY, 100, 26, 'DEL', { onTap: function () { S[field] = S[field].slice(0, -1); } });
-    button(108, ctrlY, 90, 26, 'CLR', { onTap: function () { S[field] = ''; } });
-    button(202, ctrlY, 114, 26, 'Done', { onTap: function () { S.settingsMode = 'wifi'; } });
+    button(4, ctrlY, 76, 26, 'DEL', { onTap: function () { S[field] = S[field].slice(0, -1); } });
+    button(82, ctrlY, 66, 26, 'CLR', { onTap: function () { S[field] = ''; } });
+    button(150, ctrlY, 58, 26, 'CAPS', { active: S.wifiKbShift, onTap: function () { S.wifiKbShift = !S.wifiKbShift; } });
+    button(4, ctrlY + 30, W - 8, 28, 'Done', { onTap: function () { S.settingsMode = 'wifi'; } });
   }
 
   function drawSettingsTime() {

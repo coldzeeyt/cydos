@@ -3,6 +3,7 @@
 #include <SD.h>
 #include <TFT_eSPI.h>
 #include "Config.h"
+#include "SdCard.h"
 
 // Draws /cydos_wallpaper.bmp from the SD card as Home's background, if
 // present - a plain 24-bit uncompressed BMP, exactly
@@ -52,8 +53,13 @@ inline const char* activePath() { return activePathBuf(); }
 // dimensions/format, anything unexpected all just return false, never a
 // crash or a half-drawn screen).
 inline bool drawFrom(TFT_eSPI& tft, const char* path) {
+  // The tft.pushImage() calls below stay safe to interleave with the SD
+  // reads in this same loop - the display has its own dedicated SPI
+  // peripheral (USE_HSPI_PORT), so it's never affected by which pins the
+  // one SD/touch share (see SdCard.h) currently points at.
+  SdCard::useSdBus();
   File f = SD.open(path);
-  if (!f) return false;
+  if (!f) { SdCard::useTouchBus(); return false; }
 
   const int16_t wantW = Cfg::SCREEN_W;
   const int16_t wantH = Cfg::SCREEN_H - Cfg::STATUS_BAR_H;
@@ -84,6 +90,7 @@ inline bool drawFrom(TFT_eSPI& tft, const char* path) {
     }
   }
   f.close();
+  SdCard::useTouchBus();
   return ok;
 }
 

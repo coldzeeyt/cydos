@@ -33,9 +33,11 @@ void FileManagerApp::refresh() {
   _dirty = true;
   if (!_sd || !_sd->available()) return;
 
+  SdCard::useSdBus();
   File dir = SD.open(_path);
   if (!dir || !dir.isDirectory()) {
     if (dir) dir.close();
+    SdCard::useTouchBus();
     return;
   }
 
@@ -54,6 +56,7 @@ void FileManagerApp::refresh() {
     f = dir.openNextFile();
   }
   dir.close();
+  SdCard::useTouchBus();
 
   // Insertion sort: directories first, then alphabetical - MAX_ENTRIES
   // caps this well below where an O(n^2) sort would matter.
@@ -203,9 +206,11 @@ void FileManagerApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
       char full[PATH_LEN];
       joinPath(full, sizeof(full), _path, _entries[_selected].name);
       bool isDir = _entries[_selected].isDir;
+      SdCard::useSdBus();
       bool ok = isDir ? SD.rmdir(full) : SD.remove(full);
+      SdCard::useTouchBus();
       _mode = BROWSE;
-      refresh();
+      refresh(); // re-points the bus at SD itself, see SdCard.h
       setStatus(ok ? "Deleted." : (isDir ? "Folder not empty." : "Delete failed."));
       return;
     }

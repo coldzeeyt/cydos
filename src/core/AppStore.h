@@ -6,6 +6,7 @@
 #include <TFT_eSPI.h>
 #include "UI.h"
 #include "Config.h"
+#include "SdCard.h"
 
 // WiFi-side of the on-device App Store's "Get More" tab: fetch the tiny
 // pipe-delimited catalogs scripts/generate_ondevice_catalog.py publishes,
@@ -75,8 +76,14 @@ inline bool downloadToSd(TFT_eSPI& tft, const char* urlPath, const char* destPat
 
   int total = http.getSize(); // -1 if the server didn't send Content-Length
   WiFiClient* stream = http.getStreamPtr();
+  // Neither WiFi nor the display (its own dedicated SPI peripheral, see
+  // USE_HSPI_PORT) are affected by which pins the shared SD/touch bus
+  // currently points at - see SdCard.h - so it's fine for this to stay
+  // pointed at SD for the whole download loop below.
+  SdCard::useSdBus();
   File f = SD.open(destPath, FILE_WRITE);
   if (!f) {
+    SdCard::useTouchBus();
     http.end();
     return false;
   }
@@ -121,6 +128,7 @@ inline bool downloadToSd(TFT_eSPI& tft, const char* urlPath, const char* destPat
     }
   }
   f.close();
+  SdCard::useTouchBus();
   http.end();
   return total < 0 || (int)written >= total;
 }

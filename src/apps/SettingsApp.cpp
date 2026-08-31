@@ -3,9 +3,11 @@
 #include "core/Display.h"
 #include "core/SdCard.h"
 #include "core/Wallpaper.h"
+#include "core/SdCard.h"
 #include "Version.h"
 #include <SD.h>
 #include <WiFi.h>
+#include <ctype.h>
 
 void SettingsApp::onEnter(TFT_eSPI& tft) {
   _mode = MAIN;
@@ -23,9 +25,11 @@ void SettingsApp::scanWallpapers() {
   _wpCount = 1;
 
   if (!_sd || !_sd->available()) return;
+  SdCard::useSdBus();
   File dir = SD.open("/cydos_wallpapers");
   if (!dir || !dir.isDirectory()) {
     if (dir) dir.close();
+    SdCard::useTouchBus();
     return;
   }
 
@@ -49,6 +53,7 @@ void SettingsApp::scanWallpapers() {
     f = dir.openNextFile();
   }
   dir.close();
+  SdCard::useTouchBus();
 }
 
 void SettingsApp::loadWifiCreds() {
@@ -219,7 +224,9 @@ void SettingsApp::drawWifiKeyboard(TFT_eSPI& tft) {
     uint8_t len = strlen(_kbRows[r]);
     for (uint8_t c = 0; c < len; c++) {
       UI::Rect kr = kbKeyRect(r, c, len);
-      char label[2] = {_kbRows[r][c], 0};
+      // toupper() is a no-op on the digit row, so this is safe to apply
+      // across every row without special-casing which ones are letters.
+      char label[2] = {(char)(_kbShift ? toupper(_kbRows[r][c]) : _kbRows[r][c]), 0};
       tft.fillRoundRect(kr.x, kr.y, kr.w, kr.h, 4, Theme::PANEL);
       tft.setTextColor(Theme::TEXT, Theme::PANEL);
       tft.setTextDatum(MC_DATUM);
@@ -243,9 +250,12 @@ void SettingsApp::drawWifiKeyboard(TFT_eSPI& tft) {
   _kbSpaceBtn.r.y = ctrlY;
   _kbDelBtn.r.y = ctrlY;
   _kbClrBtn.r.y = ctrlY;
+  _kbShiftBtn.r.y = ctrlY;
+  _kbShiftBtn.active = _kbShift;
   _kbSpaceBtn.draw(tft);
   _kbDelBtn.draw(tft);
   _kbClrBtn.draw(tft);
+  _kbShiftBtn.draw(tft);
 
   _kbDoneBtn.r.y = ctrlY + 30;
   _kbDoneBtn.draw(tft);
@@ -321,7 +331,7 @@ void SettingsApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
       uint8_t rlen = strlen(_kbRows[r]);
       for (uint8_t c = 0; c < rlen; c++) {
         if (kbKeyRect(r, c, rlen).contains(x, y) && len < max) {
-          buf[len] = _kbRows[r][c];
+          buf[len] = _kbShift ? toupper(_kbRows[r][c]) : _kbRows[r][c];
           buf[len + 1] = 0;
           _dirty = true;
           return;
@@ -341,6 +351,7 @@ void SettingsApp::onTouch(TFT_eSPI& tft, int16_t x, int16_t y, bool down) {
     if (_kbSpaceBtn.hit(x, y) && len < max) { buf[len] = ' '; buf[len + 1] = 0; _dirty = true; }
     else if (_kbDelBtn.hit(x, y) && len > 0) { buf[len - 1] = 0; _dirty = true; }
     else if (_kbClrBtn.hit(x, y)) { buf[0] = 0; _dirty = true; }
+    else if (_kbShiftBtn.hit(x, y)) { _kbShift = !_kbShift; _dirty = true; }
     else if (_kbDoneBtn.hit(x, y)) { _mode = WIFI; _dirty = true; }
     return;
   }

@@ -61,7 +61,9 @@ private:
   UI::Button _kbSpaceBtn{{4, 0, 100, 26}, "SPACE"};
   UI::Button _kbDelBtn{{108, 0, 90, 26}, "DEL"};
   UI::Button _kbClrBtn{{202, 0, 54, 26}, "CLR"};
+  UI::Button _kbShiftBtn{{258, 0, 58, 26}, "CAPS"};
   UI::Button _kbDoneBtn{{4, 0, Cfg::SCREEN_W - 8, 28}, "Done"};
+  bool _kbShift = false; // WiFi SSID/password keyboard only - most networks need uppercase
 
   bool _draggingSlider = false;
   bool _dirty = true;

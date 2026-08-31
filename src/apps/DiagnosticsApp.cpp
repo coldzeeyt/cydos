@@ -166,7 +166,9 @@ void DiagnosticsApp::drawInfoPage(TFT_eSPI& tft) {
   tft.drawString(buf, 12, y, 1); y += lh;
 
   if (_sd && _sd->available()) {
+    SdCard::useSdBus();
     snprintf(buf, sizeof(buf), "SD card: %lu MB", (unsigned long)(SD.cardSize() / (1024UL * 1024UL)));
+    SdCard::useTouchBus();
   } else {
     snprintf(buf, sizeof(buf), "SD card: not detected");
   }
