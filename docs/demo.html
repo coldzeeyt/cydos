@@ -434,7 +434,13 @@
     S.wifiBusyNext = function () { onDone(true); };
   }
 
+  // Settings is first, not just early - it's the only way to reach Touch
+  // Test on real hardware (see main.cpp), the fix for a touch panel bad
+  // enough that swiping or hitting a small target isn't reliable yet. The
+  // demo has no touch calibration to break, but keeps the same tile order
+  // as the real firmware regardless.
   const TILES = [
+    { id: 'settings', name: 'Settings', icon: iconGear },
     { id: 'wifi', name: 'WiFi Radar', icon: iconWifi },
     { id: 'flash', name: 'Flashlight', icon: iconFlash },
     { id: 'clock', name: 'Clock', icon: iconClock },
@@ -446,7 +452,6 @@
     { id: 'browser', name: 'Browser', icon: iconGlobe },
     { id: 'obs', name: 'OBS', icon: iconBroadcast },
     { id: 'spotify', name: 'Spotify', icon: iconMusic },
-    { id: 'settings', name: 'Settings', icon: iconGear },
     { id: 'files', name: 'Files', icon: iconFolder },
     { id: 'store', name: 'App Store', icon: iconStore },
     { id: 'notes', name: 'Notes', icon: iconNotes },

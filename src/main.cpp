@@ -115,6 +115,12 @@ void setup() {
   uint8_t notesIdx = appManager.registerApp(&notesApp);
   uint8_t convertIdx = appManager.registerApp(&convertApp);
 
+  // Settings goes first, not just conveniently early - it's the only way
+  // to reach Touch Test, which is itself the fix for a touch panel bad
+  // enough that swiping to a later page or hitting a small target isn't
+  // reliable yet. A tile that size, in the corner every grid starts from,
+  // is the easiest one to land on by accident even with miscalibrated touch.
+  homeApp.addTile(UI::iconGear, settingsIdx);
   homeApp.addTile(UI::iconWifi, wifiIdx);
   homeApp.addTile(UI::iconFlash, flashIdx);
   homeApp.addTile(UI::iconClock, clockIdx);
@@ -126,7 +132,6 @@ void setup() {
   homeApp.addTile(UI::iconGlobe, browserIdx);
   homeApp.addTile(UI::iconBroadcast, obsIdx);
   homeApp.addTile(UI::iconMusic, spotifyIdx);
-  homeApp.addTile(UI::iconGear, settingsIdx);
   homeApp.addTile(UI::iconFolder, filesIdx);
   homeApp.addTile(UI::iconStore, storeIdx);
   homeApp.addTile(UI::iconNotes, notesIdx);
