@@ -214,6 +214,11 @@ inline void iconNotes(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.drawFastHLine(cx - 8, cy, 16, c);
   tft.drawFastHLine(cx - 8, cy + 6, 10, c);
 }
+inline void iconMediaPlayer(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
+  tft.drawCircle(cx, cy, 15, c);
+  int16_t x0 = cx - 5, y0 = cy - 8, y1 = cy + 8, x1 = cx + 8;
+  tft.fillTriangle(x0, y0, x0, y1, x1, cy, c);
+}
 inline void iconConvert(TFT_eSPI& tft, int16_t cx, int16_t cy, uint16_t c) {
   tft.drawFastHLine(cx - 14, cy - 6, 22, c);
   tft.drawLine(cx + 4, cy - 11, cx + 8, cy - 6, c);

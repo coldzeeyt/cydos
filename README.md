@@ -54,6 +54,11 @@ same gesture the rest of the launcher uses to tell a tap from a drag.
 - **Spotify** — shows what's currently playing on your account (track,
   artist, album, a progress bar), via a small companion script on your PC
   (see [Spotify Now Playing](#spotify-now-playing) below).
+- **Media Player** — the CYD has no speaker or audio output pin of any
+  kind, so this is a remote control for audio playing on your PC, not a
+  player itself: browse a track list, tap one to play it, Prev/Play-
+  Pause/Next/Stop and a volume slider, all via a small companion script
+  on your PC (see [Media Player companion](#media-player-companion) below).
 - **Files** — a plain SD-card file browser. Navigate folders, see file
   sizes, delete files or empty folders. Read-only beyond delete - no
   create/rename, since there's no keyboard-free way to name something new
@@ -287,6 +292,41 @@ No authentication on the local server (same LAN-only assumption as OBS -
 don't port-forward it), and it only uses Python's standard library, no
 `pip install` needed.
 
+## Media Player companion
+
+The CYD is a display/touch board - it has no speaker, no audio output pin,
+no way to make sound at all. The **Media Player** app is a remote control
+for audio playing on your PC instead, over `pc-companion/cydos_media_player.py`
+(a standalone script, same "run this on your PC" shape as the OBS/Spotify
+companions above). The app's own **?** help button repeats this walkthrough.
+
+Unlike the OBS/Spotify companions, this one needs one real dependency -
+Python has no built-in audio codec or output support, so there's no way
+around it:
+
+1. `pip install pygame` on the PC that'll actually play the audio (not
+   the CYD).
+2. Run it, pointed at a folder of `.mp3`/`.wav`/`.ogg` files:
+   ```bash
+   python3 pc-companion/cydos_media_player.py --dir "C:\path\to\music"
+   ```
+   (`--dir` defaults to the current folder if omitted; `--port` to change
+   the default `8095`.)
+3. On the CYD: open **Media Player**, tap **Edit**, enter this PC's LAN
+   IP and the port (same "find your PC's IP" steps as OBS, above), **Done**.
+4. Tap **Tracks** to browse and pick something, or **Now Playing** for
+   playback controls and volume - either way, the audio comes out of
+   *this PC's* speakers, not the CYD.
+
+**Format support:** `.mp3`/`.wav`/`.ogg` play directly via `pygame.mixer`.
+`.mp4` and other video containers are **not** decoded by this script -
+`pygame.mixer` is an audio mixer, not a video demuxer, and there's no
+video output on the CYD to show a picture on regardless. For audio
+trapped inside an mp4, pull it out first, e.g. `ffmpeg -i in.mp4 -vn out.mp3`.
+
+No authentication on the local server (same LAN-only assumption as
+OBS/Spotify - don't port-forward it).
+
 ## "New Update!" notifications
 
 Every CYD running CydOs can optionally check in and flag when a newer
@@ -398,6 +438,8 @@ docs/                    GitHub Pages site: web flasher (index.html), browser de
                          App Store (store.html), Q&A (qna.html),
                          version.json (the "New Update!" trigger - see above)
 obs-script/              cydos_scene_switcher.py - the OBS-side companion script (see above)
+spotify-script/          cydos_now_playing.py - the Spotify companion script (see above)
+pc-companion/            cydos_media_player.py - the Media Player companion script (see above)
 ```
 
 Adding a new app: implement the `App` interface in `src/apps/`, register

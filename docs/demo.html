@@ -339,6 +339,12 @@
     ctx.beginPath(); ctx.moveTo(cx - 4, cy - 14); ctx.lineTo(cx + 14, cy - 17); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx - 4, cy - 9); ctx.lineTo(cx + 14, cy - 12); ctx.stroke();
   }
+  function iconMediaPlayer(cx, cy, c) {
+    ctx.strokeStyle = c; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(cx, cy, 15, 0, Math.PI * 2); ctx.stroke();
+    ctx.fillStyle = c;
+    ctx.beginPath(); ctx.moveTo(cx - 5, cy - 8); ctx.lineTo(cx - 5, cy + 8); ctx.lineTo(cx + 8, cy); ctx.closePath(); ctx.fill();
+  }
   function iconFolder(cx, cy, c) {
     ctx.fillStyle = c; ctx.fillRect(cx - 15, cy - 8, 12, 6);
     ctx.strokeStyle = c; ctx.lineWidth = 2; ctx.strokeRect(cx - 15, cy - 4, 30, 18);
@@ -408,6 +414,8 @@
     obsMode: 'hostEdit', obsHost: '', obsScenes: [], obsFeedbackIdx: -1, obsFeedbackOk: true, obsFeedbackUntil: 0, obsHelpReturnTo: 'hostEdit',
     spotifyMode: 'hostEdit', spotifyHost: '', spotifyHasTrack: false, spotifyPlaying: false, spotifyHelpReturnTo: 'hostEdit',
     spotifyTrack: '', spotifyArtist: '', spotifyAlbum: '', spotifyProgress: 0, spotifyDuration: 0,
+    mediaMode: 'hostEdit', mediaHost: '', mediaHelpReturnTo: 'hostEdit', mediaPage: 0,
+    mediaCurrentTrack: '', mediaPlaying: false, mediaVolume: 70, mediaTracks: null,
     lockEnabled: false, locked: false, lastTapAt: 0,
     filesPath: '/', filesPage: 0, filesSelected: -1, filesMode: 'browse', filesStatus: '', filesStatusUntil: 0,
     diagTab: 'display', diagPattern: 0, diagTouchX: -1, diagTouchY: -1,
@@ -456,6 +464,7 @@
     { id: 'store', name: 'App Store', icon: iconStore },
     { id: 'notes', name: 'Notes', icon: iconNotes },
     { id: 'convert', name: 'Converter', icon: iconConvert },
+    { id: 'media', name: 'Media Player', icon: iconMediaPlayer },
     { id: 'diagnostics', name: 'Diagnostics', icon: iconDiag },
   ];
   const APP_NAMES = {
@@ -463,7 +472,7 @@
     qr: 'QR Beamer', dice: 'Dice', calc: 'Calculator', password: 'Password',
     morse: 'Morse', browser: 'Browser', obs: 'OBS', spotify: 'Spotify', settings: 'Settings',
     files: 'Files', diagnostics: 'Diagnostics', store: 'App Store',
-    notes: 'Notes', convert: 'Converter',
+    notes: 'Notes', convert: 'Converter', media: 'Media Player',
   };
 
   // Diagnostics only gets a Home tile with Settings > Dev Mode on - same
@@ -488,6 +497,7 @@
     if (id === 'browser') { S.browserMode = 'url'; S.browserLoading = false; }
     if (id === 'obs') { S.obsMode = S.obsHost ? 'grid' : 'hostEdit'; S.obsFeedbackIdx = -1; }
     if (id === 'spotify') { S.spotifyMode = S.spotifyHost ? 'nowPlaying' : 'hostEdit'; }
+    if (id === 'media') { S.mediaMode = S.mediaHost ? 'list' : 'hostEdit'; S.mediaPage = 0; }
     if (id === 'settings') S.settingsMode = 'main';
     if (id === 'files') { S.filesPath = '/'; S.filesPage = 0; S.filesSelected = -1; S.filesMode = 'browse'; }
     if (id === 'diagnostics') { S.diagTab = 'display'; S.diagPattern = 0; S.diagTouchX = -1; S.diagTouchY = -1; }
@@ -1571,6 +1581,174 @@
     S.spotifyMode === 'hostEdit' ? drawSpotifyHostEdit() : drawSpotifyNowPlaying();
   }
 
+  // ---------- Media Player ----------
+  // The CYD has no speaker or audio output pin of any kind - this is a
+  // remote control for audio playing on your PC via the companion script
+  // in pc-companion/cydos_media_player.py, same shape as OBS/Spotify's
+  // companions. The demo can't reach a real one (this page is https,
+  // companions are plain http on your LAN - mixed content blocking, same
+  // as every other companion-script app here), so "Load sample" fakes a
+  // track listing instead, exactly like Spotify's "Sync" fakes a track.
+  const MEDIA_KB_ROWS = ['1234567890', 'qwertyuiop', 'asdfghjkl', 'zxcvbnm', '.:-'];
+  const MEDIA_HELP_LINES = [
+    'The CYD has no speaker - audio',
+    'plays on your PC, this just',
+    'remote-controls it.',
+    '1. On your PC: pip install pygame',
+    '2. python3 cydos_media_player.py',
+    '   --dir "C:\\path\\to\\music"',
+    '   (in pc-companion/, mp3/wav/ogg)',
+    "3. Get this PC's LAN IP (ipconfig",
+    '   or ifconfig)',
+    '4. Enter IP:8095 above',
+  ];
+  const MEDIA_SAMPLE_TRACKS = [
+    'Morning Coffee.mp3', 'Late Night Drive.mp3', 'Ocean Breeze.wav',
+    'City Lights.mp3', 'Slow Burn.ogg', 'Afterglow.mp3',
+    'Neon Rain.mp3', 'Windward.wav', 'Paper Planes.mp3', 'Quiet Static.ogg',
+  ];
+  const MEDIA_ROWS_PER_PAGE = 6;
+  function mediaPageCount() { return S.mediaTracks ? Math.ceil(S.mediaTracks.length / MEDIA_ROWS_PER_PAGE) : 0; }
+  function mediaRowRect(rowInPage) { return { x: 4, y: STATUS_H + 28 + rowInPage * 26, w: W - 8, h: 24 }; }
+
+  function drawMediaHelp() {
+    clearContent();
+    centerText('Media Player Setup', W / 2, STATUS_H + 12, '600 12px "IBM Plex Mono", monospace', Theme.accent);
+    ctx.fillStyle = Theme.text;
+    ctx.font = '500 9px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    let y = STATUS_H + 26;
+    for (const line of MEDIA_HELP_LINES) { ctx.fillText(line, 8, y); y += 13; }
+    button(4, H - 36, 90, 30, 'Back', { onTap: function () { S.mediaMode = S.mediaHelpReturnTo; } });
+  }
+
+  function drawMediaHostEdit() {
+    clearContent();
+    roundRect(4, STATUS_H + 2, W - 8 - 32, 24, 4); ctx.fillStyle = Theme.panel; ctx.fill();
+    ctx.fillStyle = S.mediaHost ? Theme.text : Theme.muted;
+    ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+    const shown = S.mediaHost.length > 26 ? S.mediaHost.slice(-26) : S.mediaHost;
+    ctx.fillText(S.mediaHost ? shown : 'host:port, e.g. 192.168.1.50:8095', 10, STATUS_H + 15);
+    button(W - 32, STATUS_H + 2, 28, 22, '?', { onTap: function () { S.mediaHelpReturnTo = 'hostEdit'; S.mediaMode = 'help'; } });
+
+    const top = STATUS_H + 30, rowH = 24;
+    MEDIA_KB_ROWS.forEach(function (row, r) {
+      const keyW = W / row.length;
+      for (let c = 0; c < row.length; c++) {
+        const x = c * keyW + 1, y = top + r * rowH;
+        const ch = row[c];
+        button(x, y, keyW - 2, rowH - 4, ch, { onTap: function () { if (S.mediaHost.length < 64) S.mediaHost += ch; } });
+      }
+    });
+
+    const ctrlY = top + MEDIA_KB_ROWS.length * rowH + 4;
+    button(4, ctrlY, 100, 26, 'DEL', { onTap: function () { S.mediaHost = S.mediaHost.slice(0, -1); } });
+    button(108, ctrlY, 90, 26, 'CLR', { onTap: function () { S.mediaHost = ''; } });
+    button(202, ctrlY, 114, 26, 'Done', { onTap: function () { S.mediaMode = 'list'; } });
+  }
+
+  function drawMediaList() {
+    clearContent();
+    button(4, STATUS_H + 2, 90, 22, 'Now Playing', { onTap: function () { S.mediaMode = 'player'; } });
+    button(W - 84, STATUS_H + 2, 48, 22, 'Edit', { onTap: function () { S.mediaMode = 'hostEdit'; } });
+    button(W - 32, STATUS_H + 2, 28, 22, '?', { onTap: function () { S.mediaHelpReturnTo = 'list'; S.mediaMode = 'help'; } });
+
+    if (!S.mediaTracks) {
+      centerText('DEMO - tracks not loaded yet', W / 2, H / 2 - 16, '500 11px "IBM Plex Mono", monospace', Theme.muted);
+      button(W / 2 - 60, H / 2, 120, 30, 'Load sample', {
+        onTap: function () {
+          beginWifiConnect(function (ok) { if (ok) S.mediaTracks = MEDIA_SAMPLE_TRACKS.slice(); });
+        },
+      });
+      return;
+    }
+    if (S.mediaTracks.length === 0) {
+      centerText('No .mp3/.wav/.ogg files found', W / 2, H / 2, '500 11px "IBM Plex Mono", monospace', Theme.muted);
+      return;
+    }
+
+    const base = S.mediaPage * MEDIA_ROWS_PER_PAGE;
+    for (let row = 0; row < MEDIA_ROWS_PER_PAGE; row++) {
+      const i = base + row;
+      if (i >= S.mediaTracks.length) break;
+      const r = mediaRowRect(row);
+      const isCurrent = S.mediaTracks[i] === S.mediaCurrentTrack && S.mediaCurrentTrack;
+      roundRect(r.x, r.y, r.w, r.h, 4); ctx.fillStyle = isCurrent ? Theme.panel2 : Theme.panel; ctx.fill();
+      ctx.fillStyle = isCurrent ? Theme.accent : Theme.text;
+      ctx.font = '500 11px "IBM Plex Mono", monospace'; ctx.textAlign = 'left';
+      ctx.fillText(S.mediaTracks[i], r.x + 8, r.y + r.h / 2 + 1);
+      ctx.textAlign = 'left';
+      registerHit(r.x, r.y, r.w, r.h, function () {
+        S.mediaCurrentTrack = S.mediaTracks[i];
+        S.mediaPlaying = true;
+        S.mediaMode = 'player';
+      });
+    }
+
+    const pc = mediaPageCount();
+    if (pc > 1) {
+      const prevActive = S.mediaPage > 0, nextActive = S.mediaPage + 1 < pc;
+      button(40, STATUS_H + 184, 60, 22, '<', {
+        textColor: prevActive ? Theme.text : Theme.muted,
+        onTap: function () { if (S.mediaPage > 0) S.mediaPage--; },
+      });
+      button(W - 100, STATUS_H + 184, 60, 22, '>', {
+        textColor: nextActive ? Theme.text : Theme.muted,
+        onTap: function () { if (S.mediaPage + 1 < pc) S.mediaPage++; },
+      });
+      centerText((S.mediaPage + 1) + '/' + pc, W / 2, STATUS_H + 196, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    }
+  }
+
+  function drawMediaPlayer() {
+    clearContent();
+    button(4, STATUS_H + 2, 70, 22, 'Tracks', { onTap: function () { S.mediaMode = 'list'; } });
+    button(W - 32, STATUS_H + 2, 28, 22, '?', { onTap: function () { S.mediaHelpReturnTo = 'player'; S.mediaMode = 'help'; } });
+
+    const nameY = STATUS_H + 50;
+    centerText(S.mediaCurrentTrack || 'Nothing playing', W / 2, nameY,
+      '600 13px "IBM Plex Mono", monospace', S.mediaCurrentTrack ? Theme.text : Theme.muted);
+    if (S.mediaCurrentTrack) {
+      centerText(S.mediaPlaying ? 'Playing' : 'Paused', W / 2, nameY + 22,
+        '500 10px "IBM Plex Mono", monospace', S.mediaPlaying ? Theme.good : Theme.muted);
+    }
+
+    const ctrlY = STATUS_H + 92;
+    button(20, ctrlY, 60, 30, 'Prev', {
+      onTap: function () {
+        if (!S.mediaTracks || !S.mediaTracks.length) return;
+        const i = S.mediaTracks.indexOf(S.mediaCurrentTrack) - 1;
+        S.mediaCurrentTrack = S.mediaTracks[(i + S.mediaTracks.length) % S.mediaTracks.length];
+        S.mediaPlaying = true;
+      },
+    });
+    button(90, ctrlY, 140, 30, S.mediaPlaying ? 'Pause' : 'Play', {
+      onTap: function () { if (S.mediaCurrentTrack) S.mediaPlaying = !S.mediaPlaying; },
+    });
+    button(240, ctrlY, 60, 30, 'Next', {
+      onTap: function () {
+        if (!S.mediaTracks || !S.mediaTracks.length) return;
+        const i = S.mediaTracks.indexOf(S.mediaCurrentTrack) + 1;
+        S.mediaCurrentTrack = S.mediaTracks[(i + S.mediaTracks.length) % S.mediaTracks.length];
+        S.mediaPlaying = true;
+      },
+    });
+    button(W / 2 - 40, ctrlY + 34, 80, 24, 'Stop', {
+      onTap: function () { S.mediaCurrentTrack = ''; S.mediaPlaying = false; },
+    });
+
+    const volY = ctrlY + 66;
+    centerText('Volume', W / 2, volY, '500 10px "IBM Plex Mono", monospace', Theme.muted);
+    slider(40, volY + 10, W - 80, 22, S.mediaVolume, function (v) { S.mediaVolume = v; });
+
+    centerText('DEMO - Prev/Next/Play cycle sample tracks', W / 2, H - 6, '400 8px "IBM Plex Mono", monospace', Theme.muted);
+  }
+
+  function drawMedia() {
+    if (S.mediaMode === 'help') return drawMediaHelp();
+    if (S.mediaMode === 'hostEdit') return drawMediaHostEdit();
+    S.mediaMode === 'player' ? drawMediaPlayer() : drawMediaList();
+  }
+
   // ---------- Files ----------
   // A browser tab has no real SD card to read, so this browses a small
   // fake in-memory filesystem instead - deleting something here really
@@ -2473,7 +2651,7 @@
     qr: drawQr, dice: drawDice, calc: drawCalc, password: drawPassword,
     morse: drawMorse, browser: drawBrowser, obs: drawObs, spotify: drawSpotify, settings: drawSettings,
     files: drawFiles, diagnostics: drawDiagnostics, store: drawStore,
-    notes: drawNotes, convert: drawConvert,
+    notes: drawNotes, convert: drawConvert, media: drawMedia,
   };
 
   const LOCK_DOUBLE_TAP_WINDOW_MS = 600;

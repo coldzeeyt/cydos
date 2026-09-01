@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 #include <Preferences.h>
+#include <SD.h>
 
 #include "Config.h"
 #include "core/UI.h"
@@ -32,6 +33,7 @@
 #include "apps/CommunityStoreApp.h"
 #include "apps/NotesApp.h"
 #include "apps/UnitConverterApp.h"
+#include "apps/MediaPlayerApp.h"
 
 TFT_eSPI tft;
 Touch touch;
@@ -61,6 +63,7 @@ DiagnosticsApp diagApp(&battery, &sdCard, &touch);
 CommunityStoreApp communityStoreApp(&appManager, &prefs, &sdCard, &sdAppPool);
 NotesApp notesApp(&prefs);
 UnitConverterApp convertApp;
+MediaPlayerApp mediaPlayerApp(&prefs);
 
 uint8_t g_lastSavedBrightness = 80;
 uint32_t g_lastBrightnessCheck = 0;
@@ -81,6 +84,34 @@ uint32_t g_lastBrightnessCheck = 0;
 // instead. tft/touch are already initialized by normal setup() by the
 // time this can run, so it doesn't redo that. Never returns; power-cycle
 // (without touching BOOT) to boot normally again.
+// Two guesses at the SD slot's real wiring (touch-shared, then a separate
+// dedicated-pins guess) have both failed to detect a real, known-good
+// card on real hardware - rather than guess a third pinout blind, try
+// several documented CYD SD wiring variants in turn and report which one
+// (if any) actually works, straight from the device.
+struct SdPinCandidate { const char* label; int8_t clk, miso, mosi; };
+static const SdPinCandidate SD_PIN_CANDIDATES[] = {
+  {"touch-shared 25/39/32", 25, 39, 32},
+  {"18/19/23", 18, 19, 23},
+  {"display-shared 14/12/13", 14, 12, 13},
+};
+
+// Tries each candidate in turn (CS fixed at Cfg::SD_CS - every wiring
+// reference agrees on that pin even where they disagree on the rest);
+// returns the label of the first one SD.begin() succeeds on, or nullptr
+// if none did. Fills outSizeMb with the card size when one works.
+const char* scanSdPins(uint32_t* outSizeMb) {
+  for (const SdPinCandidate& cand : SD_PIN_CANDIDATES) {
+    SD.end();
+    SPI.begin(cand.clk, cand.miso, cand.mosi, Cfg::SD_CS);
+    if (SD.begin(Cfg::SD_CS, SPI, 4000000)) {
+      if (outSizeMb) *outSizeMb = SD.cardSize() / (1024UL * 1024UL);
+      return cand.label;
+    }
+  }
+  return nullptr;
+}
+
 void runTouchDiagMode() {
   tft.fillScreen(TFT_BLACK);
   tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -89,6 +120,15 @@ void runTouchDiagMode() {
   tft.drawString("(entered by holding BOOT for 1s after boot)", 10, 30, 1);
   tft.drawString("Press each corner, note the raw numbers below.", 10, 44, 1);
   tft.drawString("Power-cycle without touching BOOT to exit.", 10, 58, 1);
+
+  uint32_t sdSizeMb = 0;
+  const char* sdResult = scanSdPins(&sdSizeMb);
+  tft.setTextColor(sdResult ? TFT_GREEN : TFT_RED, TFT_BLACK);
+  char sdLine[64];
+  if (sdResult) snprintf(sdLine, sizeof(sdLine), "SD: FOUND on %s (%lu MB)", sdResult, (unsigned long)sdSizeMb);
+  else snprintf(sdLine, sizeof(sdLine), "SD: not found on any known pinout");
+  tft.drawString(sdLine, 10, 68, 1);
+  touch.begin(); // scanSdPins() left the shared bus pointed at whichever pins it tried last - hand it back
 
   int16_t minX = 32767, maxX = -32768, minY = 32767, maxY = -32768;
   int16_t lastRx = -1, lastRy = -1;
@@ -171,6 +211,7 @@ void setup() {
   uint8_t storeIdx = appManager.registerApp(&communityStoreApp);
   uint8_t notesIdx = appManager.registerApp(&notesApp);
   uint8_t convertIdx = appManager.registerApp(&convertApp);
+  uint8_t mediaIdx = appManager.registerApp(&mediaPlayerApp);
 
   // Settings goes first, not just conveniently early - it's the only way
   // to reach Touch Test, which is itself the fix for a touch panel bad
@@ -193,6 +234,7 @@ void setup() {
   homeApp.addTile(UI::iconStore, storeIdx);
   homeApp.addTile(UI::iconNotes, notesIdx);
   homeApp.addTile(UI::iconConvert, convertIdx);
+  homeApp.addTile(UI::iconMediaPlayer, mediaIdx);
   // Diagnostics only gets a Home tile with Settings > Dev Mode on - a
   // full-screen solid-red test pattern isn't something a regular user
   // should be able to stumble into by accident.
@@ -254,7 +296,8 @@ void loop() {
   // on/off timing a Morse signal depends on.
   if (appManager.currentApp() != &wifiApp && appManager.currentApp() != &browserApp &&
       appManager.currentApp() != &obsApp && appManager.currentApp() != &spotifyApp &&
-      appManager.currentApp() != &morseApp && appManager.currentApp() != &communityStoreApp) {
+      appManager.currentApp() != &morseApp && appManager.currentApp() != &communityStoreApp &&
+      appManager.currentApp() != &mediaPlayerApp) {
     updateChecker.update();
   }
 
